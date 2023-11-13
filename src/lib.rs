@@ -2,27 +2,25 @@
 #![no_std]
 
 use core::panic::PanicInfo;
-
-struct multboot_info{
-    total_size: u32,
-    pad: u32
-}
+mod font;
+mod fb;
+use fb::FrameBuffer;
 
 #[no_mangle]
 pub extern "C" fn rust_main(){
-    // ATTENTION: we have a very small stack and no guard page
-
+    let buffer_ptr: *mut u32 = (0xb8000 + 1988) as *mut u32;
+    let mut frameBuffer: FrameBuffer = FrameBuffer{_width: 800, _pos_x: 0, _pos_y: 0, 
+        _max_x: 800 / fb::FONT_WIDTH, 
+        _max_y: 600 / fb::FONT_WIDTH, 
+        _buffer: buffer_ptr};
+    
+    /* Test output */
     let hello = b"Hello World!";
-    let color_byte = 0xf1; // white foreground, blue background
-
-    let mut hello_colored = [color_byte; 24];
-    for (i, char_byte) in hello.into_iter().enumerate() {
-        hello_colored[i*2] = *char_byte;
+    for(i, ch) in hello.into_iter().enumerate()
+    {
+        frameBuffer.output(*ch);
     }
 
-    // write `Hello World!` to the center of the VGA text buffer
-    let buffer_ptr = (0xb8000) as *mut _;
-    unsafe { *buffer_ptr = hello_colored };
     loop{}
 }
 

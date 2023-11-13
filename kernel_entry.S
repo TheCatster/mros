@@ -59,8 +59,8 @@ _start32:
 
 .code64
 _start64:
-	movq $kernel_stack, %rsp
-	callq rust_main
+	movq $kernel_stack, %rsp    /* set kernel stack */
+	callq rust_main             /* enter rust kernel */
 
 .data
 
