@@ -2,24 +2,26 @@
 #![no_std]
 
 use core::panic::PanicInfo;
-mod font;
-mod fb;
-use fb::FrameBuffer;
+
+extern crate multiboot2;
+use multiboot2::{Tag, TagType, FramebufferTag};
+
+mod drivers;
+use crate::drivers::console::{multiboot_info, find_fb, STDOUT};
+
+mod mm;
+use mm::page_table_entry::PhysAddr;
+use mm::phys_page::kernel_heap_init;
 
 #[no_mangle]
-pub extern "C" fn rust_main(){
-    let buffer_ptr: *mut u32 = (0xb8000 + 1988) as *mut u32;
-    let mut frameBuffer: FrameBuffer = FrameBuffer{_width: 800, _pos_x: 0, _pos_y: 0, 
-        _max_x: 800 / fb::FONT_WIDTH, 
-        _max_y: 600 / fb::FONT_WIDTH, 
-        _buffer: buffer_ptr};
-    
-    /* Test output */
-    let hello = b"Hello World!";
-    for(i, ch) in hello.into_iter().enumerate()
-    {
-        frameBuffer.output(*ch);
-    }
+pub extern "C" fn rust_main(info: *mut multiboot_info, free_mem_base: *mut u8)
+{
+    // Initialize FrameBuffer
+    let buffer_base: *mut u32 = find_fb(info) as *mut u32;
+    STDOUT.set_base(buffer_base);
+
+    // Set kernel heap start
+    kernel_heap_init(PhysAddr::from(free_mem_base));
 
     loop{}
 }

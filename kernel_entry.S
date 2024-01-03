@@ -15,6 +15,14 @@ header_start:
 	.long -(0xe85250d6 + 0 + (header_end - header_start))	/* checksum */
 
 .align 8
+	.word 5				/* request 800x600x32 framebuffer */
+	.word 0
+	.long 20
+	.long 800
+	.long 600
+	.long 32
+
+.align 8
 	.word 0
 	.word 0
 	.long 8													/* end tag */
@@ -59,6 +67,8 @@ _start32:
 
 .code64
 _start64:
+	movl %ebx, %edi				/* multiboot2 info */
+	movq $0x200000, %rsi		/* free memory: after 2 MiB */
 	movq $kernel_stack, %rsp    /* set kernel stack */
 	callq rust_main             /* enter rust kernel */
 
@@ -71,6 +81,8 @@ gdt:
 	.quad 0x00cf9b000000ffff	/* 0x08: KERNEL code (32-bit) */
 	.quad 0x00af9b000000ffff	/* 0x10: KERNEL code (64-bit) */
 	.quad 0x00cf93000000ffff	/* 0x18: KERNEL data (64-bit) */
+	.quad 0x00cff3000000ffff	/* 0x20: USER data (64-bit) */
+	.quad 0x00affb000000ffff	/* 0x28: USER code (64-bit) */
 gdt_end:
 
 /*

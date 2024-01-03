@@ -7,3 +7,12 @@ edition = "2021"
 crate-type = ["staticlib"]
 
 [dependencies]
+multiboot2 = "0.1.0"
+spin = "0.5.2"
+
+[dependencies.lazy_static]
+version = "1.0"
+feature = ["spin_no_std"]
+
+[dependencies.bitflags]
+version = "2.4.1"
