@@ -41,6 +41,12 @@ impl PhysAddr{
     pub const fn to_mut_ptr(self) -> *mut u8{
         self.phys_addr as *mut u8
     }
+
+    // Convert to usize
+    #[inline]
+    pub const fn to_usize(self) -> usize{
+        self.phys_addr as usize
+    }
 }
 
 impl VirtAddr{
@@ -212,6 +218,12 @@ impl PTE {
     #[inline]
     pub const fn new() -> Self {
         Self { entry: 0}
+    }
+
+    /// Set unused.
+    #[inline]
+    pub fn set_unused(&mut self){
+        self.entry = 0;
     }
 
     /// Get physical address from page table entry.
