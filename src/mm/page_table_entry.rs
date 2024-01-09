@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_variables)]
+
 #![no_std]
 
 use core::ops::{Add, AddAssign, Sub, SubAssign};

@@ -19,7 +19,7 @@ $(BOOT): $(KERNEL)
 
 # Compile rust kernel
 $(RUST_KERNEL): 
-	xargo build --target=x86_64-mros
+	RUST_TARGET_PATH=/home/arjenk/Documents/workspace/mros xargo build --target x86_64-mros
 
 # Kernel and user program compilation
 CC = gcc
