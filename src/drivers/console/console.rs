@@ -1,7 +1,9 @@
 extern crate multiboot2;
 use multiboot2::{Tag, TagType, FramebufferTag, FramebufferType};
 
-use fb::FrameBuffer;
+use super::fb::FrameBuffer;
+
+//use lazy_static::lazy_static;
 
 use core::fmt;
 use spin::Mutex;
@@ -28,42 +30,49 @@ lazy_static!{
         _font_height: 8,
         _pos_x: 0,
         _pos_y: 0,
-        _max_x: _width / _font_width,
-        _max_y: 600 / _font_height,
-        _buffer: unsafe{0xb8000 as *mut u32},
+        _max_x: 800 / 16,
+        _max_y: 600 / 8,
+        _buffer: 0xb8000 as usize,
     });
 }
 
-pub struct multiboot_info{
+unsafe impl Send for STDOUT {}
+unsafe impl Sync for STDOUT {}
+
+pub struct MultibootInfo{
     pub total_size: u32,
     pub pad: u32,
 }
 
 /// Find frame buffer from multiboot structure.
-pub fn find_fb(info: *mut multiboot_info)->*mut u8{
-    /// To avoid dependency on mutiboot2 crate, we don't directly use TagIter here.
+pub fn find_fb(info: *mut MultibootInfo)->*mut u8{
     unsafe{
         let mut curr: Tag = *(info.add(1) as *const Tag);
         while curr.typ() != TagType::End{
             if curr.typ() == TagType::Framebuffer{
-                let fb: FramebufferTag = *(&curr as *const FrameBufferTag);
-                if fb.buffer_type() == FrameBufferType::RGB &&
-                fb.bpp() == 32 && fb.width() == 800 &&
-                fb.height() == 600 && fb.pitch() == 3200{
-                    return (fb.address() as *mut u8);
+                let mut fb: &FramebufferTag = curr.cast_tag::<FramebufferTag>();
+                let buf_type = fb.buffer_type();
+                match buf_type{
+                    Ok(_) => {
+                        if fb.bpp() == 32 && fb.width() == 800 &&
+                           fb.height() == 600 && fb.pitch() == 3200{
+                            return fb.address() as *mut u8;
+                        }
+                    }
                 }
+
             }
             let next: *const Tag = &curr;
-            let next_offset = ((curr.size() + 7) &!7) as usize;
+            let next_offset = ((curr.size + 7) &!7) as usize;
             curr = *((next as *const u8).add(next_offset) as *const Tag);
         }
-        return (0 as *mut u8);
+        return 0 as *mut u8;
     }
 }
 
 /// Override format write for frameBuffer.
 impl fmt::Write for FrameBuffer{
-    fn print(&mut self, s: &str)->fmt::Result{
+    fn write_str(&mut self, s: &str)->fmt::Result{
         self.print_str(s);
         Ok(())
     }

@@ -18,8 +18,8 @@ impl LinkedList{
     }
 
     /// Push to front.
-    pub fn push(&mut self, item: *mut size){
-        *item = self.head as usize;
+    pub fn push(&mut self, item: *mut usize){
+        unsafe{*item = self.head as usize;}
         self.head = item;
     }
 

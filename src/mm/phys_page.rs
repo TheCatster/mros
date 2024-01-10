@@ -1,11 +1,10 @@
 #![allow(dead_code)]
 
-use page_table_entry::PhysAddr;
-use utils::LinkedList;
+use super::page_table_entry::PhysAddr;
+use lazy_static::lazy_static;
+use crate::utils::linked_list::LinkedList;
 
 use core::slice::from_raw_parts_mut;
-use core::ptr::write_bytes;
-use spin::Mutex;
 
 use super::page_table_entry::VirtAddr;
 
@@ -14,28 +13,25 @@ pub const PAGE_SIZE: usize = 4096;
 pub const PHYS_TO_VIRT_BASE: usize = 0;
 
 lazy_static!{
-    pub static ref FREE_MEM_BASE: Mutex<PhysAddr> = Mutex::new(PhysAddr{phys_addr: 0});
+    pub static ref FREE_MEM_BASE: PhysAddr = PhysAddr{phys_addr: 0};
     pub static ref KERNEL_HEAP_TOP: usize = 0;
 }
 
 /// Initialize kernel heap.
 #[inline]
 pub fn kernel_heap_init(free_mem_base: PhysAddr){
-    FREE_MEM_BASE = free_mem_base;
-    KERNEL_HEAP_TOP = FREE_MEM_BASE;
 }
 
 /// Allocate next physical page direcly from kernel heap.
 #[inline]
 pub fn alloc_next_frame() -> PhysAddr{
-    KERNEL_HEAP_TOP = KERNEL_HEAP_TOP + PAGE_SIZE;
-    PhysAddr::from(KERNEL_HEAP_TOP)
+    PhysAddr{phys_addr: 0}
 }
 
 /// Set the whole physical page to a value.
 #[inline]
 pub fn set_frame(frame: PhysAddr, val: u8){
-    let frame_content: *mut u8 = unsafe{ slice::from_raw_parts_mut(frame.to_mut_ptr(), PAGE_SIZE)};
+    let frame_content: *mut u8 = unsafe{from_raw_parts_mut(frame.to_mut_ptr(), PAGE_SIZE)};
     unsafe{core::ptr::write_bytes(frame_content, val, PAGE_SIZE)};
 }
 
@@ -61,9 +57,9 @@ impl SimpleAllocator{
     }
 
     /// Allocate a new physical page.
-    pub fn alloc() -> PhysAddr{
-        if !free_list.is_empty(){
-            let mut free_page: usize = *free_list.pop();
+    pub fn alloc(&mut self) -> PhysAddr{
+        if !self.free_list.is_empty(){
+            let mut free_page: usize = *(self.free_list.pop());
             PhysAddr::from(free_page)
         }
         else{
@@ -72,15 +68,13 @@ impl SimpleAllocator{
                 set_frame(next_frame, 0);
                 next_frame
             };
-            next_frame
+            frame
         }
     }
 
     /// Free a physical page.
-    pub fn free(paddr: PhysAddr){
+    pub fn free(&mut self, paddr: PhysAddr){
         let free_node: *mut usize = (&paddr.to_usize()) as *mut usize;
-        free_list.push(free_node);
+        self.free_list.push(free_node);
     }
 }
-
-/// TODO: Buddy Allocator.

@@ -1,10 +1,7 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
 
-#![no_std]
-
 use core::ops::{Add, AddAssign, Sub, SubAssign};
-use bitflags::bitflags;
 
 /// Physical address
 #[derive(Copy, Clone, Default, Ord, PartialOrd, Eq, PartialEq)]
@@ -89,7 +86,7 @@ impl Add<usize> for PhysAddr{
     type Output = Self;
     #[inline]
     fn add(self, offset: usize) -> Self{
-        Self{ phys_addr: self.phys_addr + offset }
+        Self{ phys_addr: self.phys_addr + offset as u64 }
     }
 }
 
@@ -106,7 +103,7 @@ impl Sub<usize> for PhysAddr{
     type Output = Self;
     #[inline]
     fn sub(self, offset: usize) -> Self{
-        Self{ phys_addr: self.phys_addr - offset }
+        Self{ phys_addr: self.phys_addr - offset as u64 }
     }
 }
 
@@ -141,7 +138,7 @@ impl Add<usize> for VirtAddr{
     type Output = Self;
     #[inline]
     fn add(self, offset: usize) -> Self{
-        Self{ virt_addr: self.virt_addr + offset }
+        Self{ virt_addr: self.virt_addr + offset as u64 }
     }
 }
 
@@ -158,13 +155,12 @@ impl Sub<usize> for VirtAddr{
     type Output = Self;
     #[inline]
     fn sub(self, offset: usize) -> Self{
-        Self{ virt_addr: self.virt_addr - offset }
+        Self{ virt_addr: self.virt_addr - offset as u64 }
     }
 }
 
 /// Override '-=' trait for virtual address
 impl SubAssign<usize> for VirtAddr{
-    type Output = Self;
     #[inline]
     fn sub_assign(&mut self, offset: usize){
         *self = *self - offset;
@@ -172,38 +168,35 @@ impl SubAssign<usize> for VirtAddr{
 }
 
 /// Page Table Entry Flags
+pub struct PteFlags(u64);
 
-bitflags! {
-    pub struct PteFlags: u64 {
-        /// The page is in memory.
-        const PRESENT =       1;
-        /// The page is writable.
-        const WRITABLE =      1 << 1;
-        /// User mode codes have right to
-        /// access this page.
-        const USER =          1 << 2;
-        /// Writes go directly to memory.
-        const WRITE_THROUGH = 1 << 3;
-        /// No cache is used for this page.
-        const NO_CACHE =      1 << 4;
-        /// CPU sets this bit when this page is 
-        /// accessed.
-        const ACCESSED =      1 << 5;
-        /// CPU sets this bit when this page is 
-        /// modified.
-        const DIRTY =         1 << 6;
-        /// Whether to use huge page. Must be 0 in
-        /// level-1 and level-4 page table.
-        const HUGE_PAGE =     1 << 7;
-        /// Page isn't flushed from caches on address
-        /// space switch. PGE bit of CR4 register must
-        /// be set.
-        const GLOBAL =        1 << 8;
-        /// Forbid executing code on this page. The
-        /// NXE bit in the EFER register must be set.
-        const NO_EXECUTE =    1 << 63;
-    }
-}
+/// The page is in memory.
+pub const PRESENT: u64 =       1;
+/// The page is writable.
+pub const WRITABLE: u64 =      1 << 1;
+/// User mode codes have right to
+/// access this page.
+pub const USER: u64 =          1 << 2;
+/// Writes go directly to memory.
+pub const WRITE_THROUGH: u64 = 1 << 3;
+/// No cache is used for this page.
+pub const NO_CACHE: u64 =      1 << 4;
+/// CPU sets this bit when this page is 
+/// accessed.
+pub const ACCESSED: u64 =      1 << 5;
+/// CPU sets this bit when this page is 
+/// modified.
+pub const DIRTY: u64 =         1 << 6;
+/// Whether to use huge page. Must be 0 in
+/// level-1 and level-4 page table.
+pub const HUGE_PAGE: u64 =     1 << 7;
+/// Page isn't flushed from caches on address
+/// space switch. PGE bit of CR4 register must
+/// be set.
+pub const GLOBAL: u64 =        1 << 8;
+/// Forbid executing code on this page. The
+/// NXE bit in the EFER register must be set.
+pub const NO_EXECUTE: u64 =    1 << 63;
 
 /// 64bits page table entry.
 #[derive(Clone)]
@@ -244,26 +237,26 @@ impl PTE {
     /// Set flags.
     #[inline]
     pub fn set_flags(&mut self, flags: PteFlags){
-        self.entry = (self.entry & PHYS_ADDR_MASK) | flags.bits();
+        self.entry = (self.entry & PHYS_ADDR_MASK) | flags as u64;
     }
 
     /// Create a page table entry for a new page.
     #[inline]
     pub fn new_page_entry(paddr: PhysAddr, flags: PteFlags) -> Self{
-        Self{ entry: flags.bits() | paddr.phys_addr }
+        Self{ entry: flags as u64 | paddr.phys_addr }
     }
 
     /// Create a page table entry for a new kernel page table.
     #[inline]
     pub fn new_table_entry(paddr: PhysAddr) -> Self{
-        let flags: PteFlags = PteFlags::PRESENT | PteFlags::WRITABLE;
-        Self{ entry: flags.bits() | paddr.phys_addr }
+        let flags: PteFlags = PRESENT | WRITABLE;
+        Self{ entry: flags as u64 | paddr.phys_addr }
     }
 
     /// Create a page table entry for a new user page table.
     #[inline]
     pub fn new_user_table_entry(paddr: PhysAddr) -> Self{
-        let flags: PteFlags = PteFlags::PRESENT | PteFlags::WRITABLE | PteFlags:: USER;
-        Self{ entry: flags.bits() | paddr.phys_addr }
+        let flags: PteFlags = PRESENT | WRITABLE | USER;
+        Self{ entry: flags as u64 | paddr.phys_addr }
     }
 }

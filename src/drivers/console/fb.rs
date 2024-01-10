@@ -1,31 +1,36 @@
-use font::_ASCII_FONT;
+use super::font::_ASCII_FONT;
 
 #[derive(Debug, Clone, Copy)]
 pub struct FrameBuffer{
-    pub _width: u32,
-    pub _font_width: u32,
-    pub _font_height: u32,
+    pub _width: usize,
+    pub _font_width: usize,
+    pub _font_height: usize,
 
-    pub _pos_x: u32,
-    pub _pos_y: u32,
-    pub _max_x: u32,
-    pub _max_y: u32,
+    pub _pos_x: usize,
+    pub _pos_y: usize,
+    pub _max_x: usize,
+    pub _max_y: usize,
 
-    pub _buffer: *mut u32,
+    pub _buffer: usize,
 }
 
 impl FrameBuffer{
+    /// Convert buffer to *mut u32
+    pub fn buffer_to_ptr(&self) -> *mut u32{
+        self._buffer as *mut u32
+    }
+
     /// Clean all frameBuffer.
     pub fn clean(&mut self){
         let buffer_size: u32 = self._max_x * self._font_width * self._max_y * self._font_height;
         for i in 0..buffer_size{
-            unsafe{ self._buffer.add(i as usize).write(0x00000000); }
+            unsafe{ self.buffer_to_ptr().add(i as usize).write(0x00000000); }
         }
     }
 
     /// Set frameBuffer base.
     pub fn set_base(&mut self, buffer: *mut u32){
-        unsafe{self._buffer = buffer;}
+        unsafe{self._buffer = buffer as usize;}
     }
 
     /// Scroll up frameBuffer.
@@ -39,8 +44,8 @@ impl FrameBuffer{
         // Move the text up one row
         loop{
             unsafe{
-                let content: u32 = *self._buffer.add(cur + row);
-                self._buffer.add(cur).write(content);
+                let content: u32 = *self.buffer_to_ptr().add(cur + row);
+                self.buffer_to_ptr().add(cur).write(content);
             }
             cur += 1;
 
@@ -53,13 +58,13 @@ impl FrameBuffer{
         // Clean up the last row
         loop{
             unsafe{
-                self._buffer.add(cur).write(0x00000000);
+                self.buffer_to_ptr().add(cur).write(0x00000000);
             }
 
             cur += 1;
 
             row -= 1;
-            if(row == 0){
+            if row == 0{
                 break;
             }
         }
@@ -93,12 +98,12 @@ impl FrameBuffer{
         let index: usize = (ch as usize) * (self._font_width * self._font_height / 8);
         unsafe{
             let ptr: *mut u8 = ((_ASCII_FONT as *const u8).add(index)) as *mut u8;
-            let mut cur: usize = self._pos_x * FONT_WIDTH + (self._pos_y * FONT_HEIGHT) * self._width;
-            for j in 0..FONT_HEIGHT{
+            let mut cur: usize = self._pos_x * self._font_width + (self._pos_y * self._font_height) * self._width;
+            for j in 0..self._font_height{
                 let mut bitmap: i8 = (*ptr.add(j)) as i8;
-                for i in 0..FONT_WIDTH{
+                for i in 0..self._font_width{
                     let color: i32 = (bitmap >> 7) as i32;
-                    self._buffer.add(cur + i).write(color as u32);
+                    self.buffer_to_ptr().add(cur + i).write(color as u32);
                     bitmap <<= 1;
                 }
                 cur += self._width;

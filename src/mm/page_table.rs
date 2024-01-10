@@ -3,10 +3,10 @@
 
 use core::arch::asm;
 use core::ops::{Index, IndexMut};
-use core::slice::from_raw_parts_mut;
+use core::slice::{from_raw_parts, from_raw_parts_mut};
 
-use page_table_entry::PTE;
-use phys_page::{SimpleAllocator};
+use super::page_table_entry::PTE;
+use super::phys_page::{SimpleAllocator};
 
 use super::page_table_entry::{PhysAddr, VirtAddr, PteFlags};
 
@@ -61,9 +61,7 @@ impl Index<usize> for PageTable{
 
 /// Provide mutable index trait for page table.
 impl IndexMut<usize> for PageTable{
-    type Output = PTE;
-
-    fn index(&mut self, index: usize) -> &mut PTE{
+    fn index_mut(&mut self, index: usize) -> &mut PTE{
         let mut ptes: &'static [PTE] = self.to_mut_ptes();
         &mut ptes[index]
     }
@@ -79,20 +77,20 @@ impl PageTable{
     /// Convert page table to a pte array.
     pub fn to_ptes(&self) -> &'static [PTE]{
         unsafe{
-            core::slice::from_raw_parts(self.base.to_raw_ptr() as *mut PTE, NUM_PAGE_ENTRY)
+            from_raw_parts(self.base.to_raw_ptr() as *mut PTE, NUM_PAGE_ENTRY)
         }
     }
 
     /// Convert page table to a mutable pte array.
     pub fn to_mut_ptes(&self) -> &'static mut [PTE]{
         unsafe{
-            core::slice::from_raw_parts_mut(self.base.to_mut_ptr() as *mut PTE, NUM_PAGE_ENTRY)
+            from_raw_parts_mut(self.base.to_mut_ptr() as *mut PTE, NUM_PAGE_ENTRY)
         }
     }
 
     /// Enable this page table.
-    pub fn enable(){
-        lcr3(self.base.phys_addr);
+    pub fn enable(&self){
+        lcr3(self.base.to_usize() as i64);
     }
 
     /// Find corresponding page table entry and make it mutable.
