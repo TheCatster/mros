@@ -15,6 +15,11 @@ pub struct FrameBuffer{
 }
 
 impl FrameBuffer{
+    /// Set buffer address.
+    pub fn set_buffer_base(&mut self, buffer_base: *mut u8){
+        self._buffer = buffer_base as usize;
+    }
+    
     /// Convert buffer to *mut u32
     pub fn buffer_to_ptr(&self) -> *mut u32{
         self._buffer as *mut u32
@@ -22,7 +27,7 @@ impl FrameBuffer{
 
     /// Clean all frameBuffer.
     pub fn clean(&mut self){
-        let buffer_size: u32 = self._max_x * self._font_width * self._max_y * self._font_height;
+        let buffer_size: usize = self._max_x * self._font_width * self._max_y * self._font_height;
         for i in 0..buffer_size{
             unsafe{ self.buffer_to_ptr().add(i as usize).write(0x00000000); }
         }

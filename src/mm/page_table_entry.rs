@@ -1,7 +1,8 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
 
-use core::ops::{Add, AddAssign, Sub, SubAssign};
+
+use core::ops::{Add, AddAssign, Sub, SubAssign, BitAnd, BitOr, BitAndAssign, BitOrAssign};
 
 /// Physical address
 #[derive(Copy, Clone, Default, Ord, PartialOrd, Eq, PartialEq)]
@@ -18,45 +19,45 @@ pub struct VirtAddr {
 }
 
 impl PhysAddr{
-    // Convert from const raw pointer
+    /// Convert from const raw pointer
     #[inline]
-    pub const fn from_raw_ptr(&mut self, raw_ptr: *const u8){
+    pub fn from_raw_ptr(&mut self, raw_ptr: *const u8){
         self.phys_addr = raw_ptr as u64;
     }
 
-    // Convert from mutable raw pointer
+    /// Convert from mutable raw pointer
     #[inline]
-    pub const fn from_mut_ptr(&mut self, mut_ptr: *mut u8){
+    pub fn from_mut_ptr(&mut self, mut_ptr: *mut u8){
         self.phys_addr = mut_ptr as u64;
     }
 
-    // Convert to const raw pointer
+    /// Convert to const raw pointer
     #[inline]
-    pub const fn to_raw_ptr(self) -> *const u8{
+    pub fn to_raw_ptr(self) -> *const u8{
         self.phys_addr as *const u8
     }
 
-    // Convert to mutable raw pointer
+    /// Convert to mutable raw pointer
     #[inline]
-    pub const fn to_mut_ptr(self) -> *mut u8{
+    pub fn to_mut_ptr(self) -> *mut u8{
         self.phys_addr as *mut u8
     }
 
-    // Convert to usize
+    /// Convert to usize
     #[inline]
-    pub const fn to_usize(self) -> usize{
+    pub fn to_usize(self) -> usize{
         self.phys_addr as usize
     }
 }
 
 impl VirtAddr{
-    // Convert to const raw pointer
+    /// Convert to const raw pointer
     #[inline]
     pub const fn to_raw_ptr(self) -> *const u8{
         self.virt_addr as *const u8
     }
 
-    // Convert to mutable raw pointer
+    /// Convert to mutable raw pointer
     #[inline]
     pub const fn to_mut_ptr(self) -> *const u8{
         self.virt_addr as *mut u8
@@ -78,6 +79,21 @@ impl From<*mut u8> for PhysAddr{
     #[inline]
     fn from(mut_ptr: *mut u8) -> Self{
         Self{ phys_addr: mut_ptr as u64 }
+    }
+}
+
+impl From<*mut usize> for PhysAddr{
+    #[inline]
+    fn from(rhs: *mut usize) -> Self{
+        Self{ phys_addr: rhs as u64 }
+    }
+}
+
+/// Conver usize to physical address.
+impl From<usize> for PhysAddr{
+    #[inline]
+    fn from(rhs: usize) -> Self{
+        Self{ phys_addr: rhs as u64 }
     }
 }
 
@@ -133,6 +149,14 @@ impl From<*mut u8> for VirtAddr{
     }
 }
 
+/// Convert usize to virtual address
+impl From<usize> for VirtAddr{
+    #[inline]
+    fn from(addr: usize) -> Self{
+        Self{ virt_addr: addr as u64 }
+    }
+}
+
 /// Override '+' trait for virtual address
 impl Add<usize> for VirtAddr{
     type Output = Self;
@@ -167,9 +191,91 @@ impl SubAssign<usize> for VirtAddr{
     }
 }
 
-/// Page Table Entry Flags
-pub struct PteFlags(u64);
+pub struct PTEFlags{
+    flags: u64,
+}
 
+impl PTEFlags{
+    #[inline]
+    pub fn new() -> Self{
+        Self{ flags: 0}
+    }
+
+    #[inline]
+    pub fn as_u64(&self) -> u64{
+        self.flags
+    }
+
+    #[inline]
+    pub fn is_contain(&self, bit: u64) -> bool{
+        if self.flags & bit != 0{
+            true
+        }
+        else{
+            false
+        }
+    }
+}
+
+impl From<usize> for PTEFlags{
+    #[inline]
+    fn from(bits: usize) -> Self{
+        Self{ flags: bits as u64}
+    }
+}
+
+impl BitAnd<PTEFlags> for u64{
+    type Output = Self;
+
+    #[inline]
+    fn bitand(self, rhs: PTEFlags) -> Self::Output {
+        self | rhs.as_u64()
+    }
+}
+
+impl BitAnd<u64> for PTEFlags{
+    type Output = Self;
+
+    #[inline]
+    fn bitand(self, rhs: u64) -> Self::Output {
+        Self{flags: self.flags & rhs}
+    }
+}
+
+impl BitAndAssign<u64> for PTEFlags{
+    #[inline]
+    fn bitand_assign(&mut self, rhs: u64) {
+        *self = Self{flags: self.flags & rhs}
+    }
+}
+
+impl BitOr<u64> for PTEFlags{
+    type Output = Self;
+
+    #[inline]
+    fn bitor(self, rhs: u64) -> Self::Output {
+        Self{flags: self.flags | rhs}
+    }
+}
+
+impl BitOr<PTEFlags> for u64{
+    type Output = Self;
+
+    #[inline]
+    fn bitor(self, rhs: PTEFlags) -> Self::Output {
+        self | rhs.as_u64()
+    }
+}
+
+impl BitOrAssign<u64> for PTEFlags{
+    #[inline]
+    fn bitor_assign(&mut self, rhs: u64) {
+        *self = Self{flags: self.flags | rhs}
+    }
+}
+
+
+/// Page Table Entry Flags
 /// The page is in memory.
 pub const PRESENT: u64 =       1;
 /// The page is writable.
@@ -236,27 +342,27 @@ impl PTE {
 
     /// Set flags.
     #[inline]
-    pub fn set_flags(&mut self, flags: PteFlags){
-        self.entry = (self.entry & PHYS_ADDR_MASK) | flags as u64;
+    pub fn set_flags(&mut self, flags: PTEFlags){
+        self.entry = (self.entry & PHYS_ADDR_MASK) | flags;
     }
 
     /// Create a page table entry for a new page.
     #[inline]
-    pub fn new_page_entry(paddr: PhysAddr, flags: PteFlags) -> Self{
-        Self{ entry: flags as u64 | paddr.phys_addr }
+    pub fn new_page_entry(paddr: PhysAddr, flags: PTEFlags) -> Self{
+        Self{ entry: flags.as_u64() | paddr.phys_addr }
     }
 
     /// Create a page table entry for a new kernel page table.
     #[inline]
     pub fn new_table_entry(paddr: PhysAddr) -> Self{
-        let flags: PteFlags = PRESENT | WRITABLE;
-        Self{ entry: flags as u64 | paddr.phys_addr }
+        let flags: PTEFlags = PTEFlags{flags: PRESENT | WRITABLE};
+        Self{ entry: flags.as_u64() | paddr.phys_addr }
     }
 
     /// Create a page table entry for a new user page table.
     #[inline]
     pub fn new_user_table_entry(paddr: PhysAddr) -> Self{
-        let flags: PteFlags = PRESENT | WRITABLE | USER;
-        Self{ entry: flags as u64 | paddr.phys_addr }
+        let flags: PTEFlags = PTEFlags{flags: PRESENT | WRITABLE | USER};
+        Self{ entry: flags.as_u64() | paddr.phys_addr }
     }
 }

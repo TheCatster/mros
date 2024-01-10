@@ -45,19 +45,22 @@ pub struct MultibootInfo{
 }
 
 /// Find frame buffer from multiboot structure.
-pub fn find_fb(info: *mut MultibootInfo)->*mut u8{
+pub fn find_fb(info: *mut MultibootInfo)->Option<*mut u8>{
     unsafe{
         let mut curr: Tag = *(info.add(1) as *const Tag);
         while curr.typ() != TagType::End{
+
             if curr.typ() == TagType::Framebuffer{
                 let mut fb: &FramebufferTag = curr.cast_tag::<FramebufferTag>();
                 let buf_type = fb.buffer_type();
                 match buf_type{
                     Ok(_) => {
-                        if fb.bpp() == 32 && fb.width() == 800 &&
-                           fb.height() == 600 && fb.pitch() == 3200{
-                            return fb.address() as *mut u8;
+                        if fb.bpp() == 32 && fb.width() == 800 && fb.height() == 600 && fb.pitch() == 3200{
+                            return Some(fb.address() as *mut u8);
                         }
+                    }
+                    Err(_) => {
+                        return None;
                     }
                 }
 
@@ -66,7 +69,7 @@ pub fn find_fb(info: *mut MultibootInfo)->*mut u8{
             let next_offset = ((curr.size + 7) &!7) as usize;
             curr = *((next as *const u8).add(next_offset) as *const Tag);
         }
-        return 0 as *mut u8;
+        return None;
     }
 }
 

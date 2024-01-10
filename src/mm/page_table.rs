@@ -1,18 +1,19 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
+#![allow(unused_doc_comments)]
 
 use core::arch::asm;
 use core::ops::{Index, IndexMut};
 use core::slice::{from_raw_parts, from_raw_parts_mut};
 
 use super::page_table_entry::PTE;
-use super::phys_page::{SimpleAllocator};
+use super::phys_page::{phys_page_alloc, phys_page_free};
 
-use super::page_table_entry::{PhysAddr, VirtAddr, PteFlags};
+use super::page_table_entry::{PhysAddr, VirtAddr};
 
 /// Store value to cr0.
 #[cfg(target_arch = "x86_64")]
-pub fn lcr0(_val: i64){
+pub fn lcr0(mut _val: i64){
     unsafe{
         asm!("movq {}, cr0", out(reg) _val);
     }
@@ -28,7 +29,7 @@ pub fn rcr0(_val: &mut i64){
 
 /// Store value to cr3.
 #[cfg(target_arch = "x86_64")]
-pub fn lcr3(_val: i64){
+pub fn lcr3(mut _val: i64){
     unsafe{
         asm!("movq {}, cr3", out(reg) _val);
     }
@@ -62,16 +63,23 @@ impl Index<usize> for PageTable{
 /// Provide mutable index trait for page table.
 impl IndexMut<usize> for PageTable{
     fn index_mut(&mut self, index: usize) -> &mut PTE{
-        let mut ptes: &'static [PTE] = self.to_mut_ptes();
+        let mut ptes: &mut [PTE] = self.to_mut_ptes();
         &mut ptes[index]
     }
 }
 
 impl PageTable{
     /// Create a new page table.
-    pub fn new() -> Self{
-        let page_table_base: PhysAddr = SimpleAllocator::alloc();
-        Self{ base: page_table_base }
+    pub fn new() -> Option<Self>{
+        let result = phys_page_alloc();
+        match result{
+            Some(phys_page)=>{
+                Some(Self{base: phys_page})
+            }
+            _ => {
+                None
+            }
+        }
     }
 
     /// Convert page table to a pte array.
@@ -93,21 +101,22 @@ impl PageTable{
         lcr3(self.base.to_usize() as i64);
     }
 
-    /// Find corresponding page table entry and make it mutable.
-    fn get_mut_pte(&mut self, vaddr: VirtAddr) -> Option<&mut PTE>{
-    }
+    // /// Find corresponding page table entry and make it mutable.
+    // fn get_mut_pte(&mut self, vaddr: VirtAddr) -> Option<&mut PTE>{
 
-    /// Access corresponding page table entry read-only.
-    fn get_pte(&self, vaddr: VirtAddr) -> Option<&mut PTE>{
+    // }
 
-    }
+    // /// Access corresponding page table entry read-only.
+    // fn get_pte(&self, vaddr: VirtAddr) -> Option<&mut PTE>{
+
+    // }
 
     /// Map physical to virtual address in this page table.
-    pub fn map(&mut self, vaddr: VirtAddr, paddr: PhysAddr, flags: PteFlags){
+    pub fn map(&mut self, vaddr: VirtAddr, paddr: PhysAddr, flags: u64){
     }
 
     /// Unmap page.
-    pub fn unmap(&mut self, vaddr: VirtAddr, paddr: PhysAddr, flags: PteFlags){
+    pub fn unmap(&mut self, vaddr: VirtAddr, paddr: PhysAddr, flags: u64){
 
     }
 }

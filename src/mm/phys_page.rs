@@ -1,38 +1,44 @@
 #![allow(dead_code)]
 
-use super::page_table_entry::PhysAddr;
-use lazy_static::lazy_static;
-use crate::utils::linked_list::LinkedList;
-
 use core::slice::from_raw_parts_mut;
+use spin::Mutex;
+use lazy_static::lazy_static;
 
+use super::page_table_entry::PhysAddr;
 use super::page_table_entry::VirtAddr;
+use crate::utils::linked_list::LinkedList;
 
 /// Set normal page size as 4k.
 pub const PAGE_SIZE: usize = 4096;
 pub const PHYS_TO_VIRT_BASE: usize = 0;
 
 lazy_static!{
-    pub static ref FREE_MEM_BASE: PhysAddr = PhysAddr{phys_addr: 0};
-    pub static ref KERNEL_HEAP_TOP: usize = 0;
+    pub static ref FREE_MEM_BASE: Mutex<PhysAddr> = Mutex::new(PhysAddr::from(0usize));
+    pub static ref KERNEL_HEAP_TOP: Mutex<usize> = Mutex::new(0usize);
+    pub static ref FREE_MEM_LIST: Mutex<LinkedList> = Mutex::new(LinkedList::new());
 }
 
 /// Initialize kernel heap.
 #[inline]
-pub fn kernel_heap_init(free_mem_base: PhysAddr){
+pub fn kernel_heap_init(free_mem_base: &PhysAddr){
+    FREE_MEM_BASE.lock().clone_from(free_mem_base);
+    *KERNEL_HEAP_TOP.lock() = FREE_MEM_BASE.lock().to_usize();
 }
 
 /// Allocate next physical page direcly from kernel heap.
 #[inline]
 pub fn alloc_next_frame() -> PhysAddr{
-    PhysAddr{phys_addr: 0}
+    *KERNEL_HEAP_TOP.lock() += PAGE_SIZE;
+    PhysAddr::from(*KERNEL_HEAP_TOP.lock())
 }
 
 /// Set the whole physical page to a value.
 #[inline]
 pub fn set_frame(frame: PhysAddr, val: u8){
-    let frame_content: *mut u8 = unsafe{from_raw_parts_mut(frame.to_mut_ptr(), PAGE_SIZE)};
-    unsafe{core::ptr::write_bytes(frame_content, val, PAGE_SIZE)};
+    let mut frame_content: &mut [u8] = unsafe{from_raw_parts_mut(frame.to_mut_ptr(), PAGE_SIZE)};
+    for i in 0..PAGE_SIZE{
+        frame_content[i] = val;
+    }
 }
 
 /// Simple physical to virtual translation by direct-mapping.
@@ -46,35 +52,30 @@ pub fn phys_to_virt(paddr: PhysAddr) -> VirtAddr{
 }
 
 /// Simple allocator: use a linked list as free memory pool.
-pub struct SimpleAllocator{
-    free_list: LinkedList,
+pub fn phys_page_alloc() -> Option<PhysAddr>{
+    if !FREE_MEM_LIST.lock().is_empty(){
+        let result: Option<*mut usize> = FREE_MEM_LIST.lock().pop();
+        match result{
+            Some(free_page) => {
+                Some(PhysAddr::from(free_page))
+            }
+            _ =>{
+                None
+            }
+        }
+    }
+    else{
+        let frame: PhysAddr = {
+            let next_frame: PhysAddr = alloc_next_frame();
+            set_frame(next_frame, 0);
+            next_frame
+        };
+        Some(frame)
+    }
 }
 
-impl SimpleAllocator{
-    /// Create a new simple physcal page allocator.
-    pub fn new() -> Self{
-        Self{ free_list: LinkedList::new() }
-    }
-
-    /// Allocate a new physical page.
-    pub fn alloc(&mut self) -> PhysAddr{
-        if !self.free_list.is_empty(){
-            let mut free_page: usize = *(self.free_list.pop());
-            PhysAddr::from(free_page)
-        }
-        else{
-            let frame: PhysAddr = {
-                let next_frame: PhysAddr = alloc_next_frame();
-                set_frame(next_frame, 0);
-                next_frame
-            };
-            frame
-        }
-    }
-
-    /// Free a physical page.
-    pub fn free(&mut self, paddr: PhysAddr){
-        let free_node: *mut usize = (&paddr.to_usize()) as *mut usize;
-        self.free_list.push(free_node);
-    }
+/// Free a physical page.
+pub fn phys_page_free(paddr: PhysAddr){
+    let free_node: *mut usize = paddr.to_mut_ptr() as *mut usize;
+    FREE_MEM_LIST.lock().push(free_node);
 }

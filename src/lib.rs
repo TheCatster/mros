@@ -19,11 +19,15 @@ mod utils;
 pub extern "C" fn rust_main(info: *mut MultibootInfo, free_mem_base: *mut u8)
 {
     // Initialize FrameBuffer
-    let buffer_base: *mut u32 = find_fb(info) as *mut u32;
-    STDOUT.set_base(buffer_base);
+    let result = find_fb(info);
+    match result{
+        Some(buffer_base)=>{
+            STDOUT.lock().set_base(buffer_base as *mut u32);
+        }
+        _=>{
 
-    // Set kernel heap start
-    kernel_heap_init(PhysAddr::from(free_mem_base));
+        }
+    }
 
     loop{}
 }
