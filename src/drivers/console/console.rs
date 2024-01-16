@@ -2,16 +2,15 @@ extern crate multiboot2;
 use multiboot2::{Tag, TagType, FramebufferTag, FramebufferType};
 
 use super::fb::FrameBuffer;
-
-//use lazy_static::lazy_static;
+use super::fb_no_font::FrameBufferNoFont;
 
 use core::fmt;
 use spin::Mutex;
 
-// println macro
+/// println macro
 #[macro_export]
 macro_rules! print {
-    ($($arg:tt)*) => ($_print(format_args!($($arg)*)));
+    ($($arg:tt)*) => ($crate::drivers::console::console::_print(format_args!($($arg)*)));
 }
 
 #[macro_export]
@@ -21,23 +20,26 @@ macro_rules! println {
 }
 
 lazy_static!{
-    // seems that we can't set global frame buffer before find fb
-    // so here we set buffer to 0xb8000 first, and adjust to new
-    // buffer address after find_fb.
-    pub static ref STDOUT: Mutex<FrameBuffer> = Mutex::new(FrameBuffer{
-        _width: 800,
-        _font_width: 16,
-        _font_height: 8,
-        _pos_x: 0,
-        _pos_y: 0,
-        _max_x: 800 / 16,
-        _max_y: 600 / 8,
-        _buffer: 0xb8000 as usize,
-    });
+    pub static ref STDOUT: Mutex<FrameBufferNoFont> = Mutex::new(FrameBufferNoFont { 
+        _width: (80), _height: (25), _pos_x: (0), _pos_y: (0), _buffer: (0xb8000 as usize) });
 }
 
 unsafe impl Send for STDOUT {}
 unsafe impl Sync for STDOUT {}
+
+/// Override format write for FrameBufferNoFont.
+impl fmt::Write for FrameBufferNoFont{
+    fn write_str(&mut self, s: &str) -> fmt::Result{
+        self.print_str(s);
+        Ok(())
+    }
+}
+
+/// Print function, provide for println! macro.
+pub fn _print(args: fmt::Arguments){
+    use core::fmt::Write;
+    STDOUT.lock().write_fmt(args).unwrap();
+}
 
 #[repr(C)]
 pub struct MultibootInfo{
@@ -66,24 +68,11 @@ pub fn find_fb(info: *mut MultibootInfo)->Option<*mut u8>{
                 }
 
             }
+
             let next: *const Tag = &curr;
             let next_offset = ((curr.size + 7) &!7) as usize;
             curr = *((next as *const u8).add(next_offset) as *const Tag);
         }
         return None;
     }
-}
-
-/// Override format write for frameBuffer.
-impl fmt::Write for FrameBuffer{
-    fn write_str(&mut self, s: &str)->fmt::Result{
-        self.print_str(s);
-        Ok(())
-    }
-}
-
-/// Print function, provide for println! macro.
-pub fn _print(args: fmt::Arguments){
-    use core::fmt::Write;
-    STDOUT.lock().write_fmt(args).unwrap();
 }
