@@ -15,11 +15,6 @@ pub struct FrameBuffer{
 }
 
 impl FrameBuffer{
-    /// Set buffer address.
-    pub fn set_buffer_base(&mut self, buffer_base: *mut u8){
-        self._buffer = buffer_base as usize;
-    }
-    
     /// Convert buffer to *mut u32
     pub fn buffer_to_ptr(&self) -> *mut u32{
         self._buffer as *mut u32

@@ -25,11 +25,11 @@ $(RUST_KERNEL):
 CC = gcc
 LD = ld
 CFLAGS += -mcmodel=small -Wall -Wno-builtin-declaration-mismatch -O2 -fno-pie -mno-red-zone -nostdinc -fno-stack-protector -fno-zero-initialized-in-bss -fno-builtin -c
-# LDFLAGS = -nostdlib -melf_x86_64 --gc-sections -z max-page-size=0x1000 -n
+# LDFLAGS = -nostdlib -melf_x86_64 -z max-page-size=0x1000 -n
 LDFLAGS = --gc-sections -n
 
 KERNEL_OBJS = kernel_entry.o
-KERNEL_OBJS += kernel_asm.o $(RUST_KERNEL) 
+KERNEL_OBJS += $(RUST_KERNEL) kernel_asm.o 
 
 $(KERNEL): $(KERNEL_OBJS)
 	$(LD) $(LDFLAGS) -T ./kernel.lds $^ -o $@

@@ -11,7 +11,7 @@ use spin::Mutex;
 // println macro
 #[macro_export]
 macro_rules! print {
-    ($($arg:tt)*) => ($crate::vga_buffer::_print(format_args!($($arg)*)));
+    ($($arg:tt)*) => ($_print(format_args!($($arg)*)));
 }
 
 #[macro_export]
@@ -39,6 +39,7 @@ lazy_static!{
 unsafe impl Send for STDOUT {}
 unsafe impl Sync for STDOUT {}
 
+#[repr(C)]
 pub struct MultibootInfo{
     pub total_size: u32,
     pub pad: u32,
