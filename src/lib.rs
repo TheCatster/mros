@@ -8,11 +8,9 @@ extern crate lazy_static;
 extern crate multiboot2;
 
 mod drivers;
-use crate::drivers::console::console::MultibootInfo;
+use crate::drivers::console::console::{MultibootInfo, fb_init};
 
 mod mm;
-use drivers::console::fb::FrameBuffer;
-use drivers::console::fb_no_font::FrameBufferNoFont;
 use mm::page_table_entry::PhysAddr;
 use mm::phys_page::kernel_heap_init;
 
@@ -20,8 +18,11 @@ mod utils;
 
 #[no_mangle]
 pub extern "C" fn kernel_start(info: *mut MultibootInfo, free_mem_base: *mut u8){
-    println!("hello world");
-    println!("mem base: {}", free_mem_base as usize);
+    // Setup frame buffer.
+    fb_init();
+
+    println!("hello world, this is micro rust os.");
+    println!("mem base: {:x}", free_mem_base as usize);
 
     loop{}
 }

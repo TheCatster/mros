@@ -41,6 +41,11 @@ pub fn _print(args: fmt::Arguments){
     STDOUT.lock().write_fmt(args).unwrap();
 }
 
+/// Clear Screen.
+pub fn fb_init(){
+    STDOUT.lock().clear();
+}
+
 #[repr(C)]
 pub struct MultibootInfo{
     pub total_size: u32,
