@@ -2,10 +2,8 @@
 
 use core::slice::from_raw_parts_mut;
 use spin::Mutex;
-use lazy_static::lazy_static;
 
-use super::page_table_entry::PhysAddr;
-use super::page_table_entry::VirtAddr;
+use super::page_table_entry::{PhysAddr, VirtAddr};
 use crate::utils::linked_list::LinkedList;
 
 /// Set normal page size as 4k.
@@ -13,8 +11,11 @@ pub const PAGE_SIZE: usize = 4096;
 pub const PHYS_TO_VIRT_BASE: usize = 0;
 
 lazy_static!{
+    // Start of kernel free memory.
     pub static ref FREE_MEM_BASE: Mutex<PhysAddr> = Mutex::new(PhysAddr::from(0usize));
+    // Top of kernel heap.
     pub static ref KERNEL_HEAP_TOP: Mutex<usize> = Mutex::new(0usize);
+    // Free memory list.
     pub static ref FREE_MEM_LIST: Mutex<LinkedList> = Mutex::new(LinkedList::new());
 }
 
