@@ -156,8 +156,29 @@ impl PageTable{
         }
     }
 
+    /// Get level 1 page table entry.
+    pub fn get_level1_pte(&self, vaddr: VirtAddr) -> &mut PTE{
+        let l4_table: & [PTE] = self.to_ptes();
+        let l4_index: usize = vaddr.l4_index();
+        let l4_pte = l4_table[l4_index];
+
+        let l3_table = self.next_mut_table_as_array(l4_pte);
+        let l3_index: usize = vaddr.l3_index();
+        let l3_pte = l3_table[l3_index];
+
+        let l2_table = self.next_mut_table_as_array(l3_pte);
+        let l2_index: usize = vaddr.l2_index();
+        let l2_pte: PTE = l2_table[l2_index];
+
+        let l1_table = self.next_mut_table_as_array(l2_pte);
+        let l1_index: usize = vaddr.l1_index();
+
+        &mut l1_table[l1_index]
+    }
+
     /// Map physical to virtual address in this page table.
     pub fn map(&mut self, vaddr: VirtAddr, paddr: PhysAddr, flags: PTEFlags){
+
         let l4_table = self.to_mut_ptes();
         let l4_index: usize = vaddr.l4_index();
         let l4_pte: &mut PTE = &mut l4_table[l4_index];
@@ -180,7 +201,9 @@ impl PageTable{
     }
 
     /// Unmap page.
-    pub fn unmap(&mut self, vaddr: VirtAddr, paddr: PhysAddr, flags: u64){
-
+    pub fn unmap(&mut self, vaddr: VirtAddr){
+        let l1_pte = self.get_level1_pte(vaddr);
+        l1_pte.set_unused();
     }
+
 }
