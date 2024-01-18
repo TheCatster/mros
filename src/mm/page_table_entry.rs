@@ -234,6 +234,7 @@ impl SubAssign<usize> for VirtAddr{
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct PTEFlags{
     flags: u64,
 }

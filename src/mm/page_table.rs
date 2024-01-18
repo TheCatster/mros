@@ -9,7 +9,7 @@ use core::slice::{from_raw_parts, from_raw_parts_mut};
 use crate::println;
 
 use super::page_table_entry::{PhysAddr, VirtAddr, PTE, PTEFlags, PRESENT, WRITABLE};
-use super::phys_page::{phys_page_alloc, phys_page_free};
+use super::phys_page::{phys_page_alloc, PAGE_SIZE};
 
 /// Store value to cr0.
 #[cfg(target_arch = "x86_64")]
@@ -177,6 +177,7 @@ impl PageTable{
     }
 
     /// Map physical to virtual address in this page table.
+    /// TODO: WE MUST ALIGN ADDRESSES!
     pub fn map(&mut self, vaddr: VirtAddr, paddr: PhysAddr, flags: PTEFlags){
 
         let l4_table = self.to_mut_ptes();
@@ -196,7 +197,6 @@ impl PageTable{
 
         let l1_table = self.next_mut_table_as_array(*l2_pte);
         let l1_index: usize = vaddr.l1_index();
-        // TODO: we need align down the physical address.
         l1_table[l1_index] = PTE::new_page_entry(paddr, flags);
     }
 
@@ -204,6 +204,29 @@ impl PageTable{
     pub fn unmap(&mut self, vaddr: VirtAddr){
         let l1_pte = self.get_level1_pte(vaddr);
         l1_pte.set_unused();
+    }
+
+    /// Map a physical region [phys_start, phys_start + size) to [virt_start, virt_start + size).
+    /// TODO: align addresses.
+    pub fn map_region(&mut self, virt_start: VirtAddr, phys_start: PhysAddr, 
+                      size: usize, flags: PTEFlags){
+        let mut step: usize = 0;
+        while step < size{
+            let virt_step: VirtAddr = virt_start + step;
+            let phys_step: PhysAddr = phys_start + step;
+            self.map(virt_step, phys_step, flags);
+            step += PAGE_SIZE;
+        }
+    }
+
+    /// Unmap a virtual region [virt_start, virt_start + size).
+    pub fn unmap_region(&mut self, virt_start: VirtAddr, size: usize){
+        let mut step: usize = 0;
+        while step < size{
+            let virt_step: VirtAddr = virt_start + step;
+            self.unmap(virt_step);
+            step += PAGE_SIZE;
+        }
     }
 
 }
