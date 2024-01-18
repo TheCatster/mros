@@ -62,6 +62,49 @@ impl VirtAddr{
     pub const fn to_mut_ptr(self) -> *const u8{
         self.virt_addr as *mut u8
     }
+
+    /// Get level 4 index.
+    #[inline]
+    pub const fn l4_index(self) -> usize{
+        (self.virt_addr as usize) >> 39 & 0x1ff
+    }
+
+    /// Get level 3 index.
+    #[inline]
+    pub const fn l3_index(self) -> usize{
+        (self.virt_addr as usize) >> 30 & 0x1ff
+    }
+
+    /// Get level 2 index.
+    #[inline]
+    pub const fn l2_index(self) -> usize{
+        (self.virt_addr as usize) >> 21 & 0x1ff
+    }
+
+    /// Get level 1 index.
+    #[inline]
+    pub const fn l1_index(self) -> usize{
+        (self.virt_addr as usize) >> 12 & 0x1ff
+    }
+
+    /// Given level, get index.
+    #[inline]
+    pub const fn index(self, level: u32) -> usize{
+        match level{
+            4 => {self.l4_index()}
+            3 => {self.l3_index()}
+            2 => {self.l2_index()}
+            1 => {self.l1_index()}
+            _ => {0x200usize}
+        }
+    }
+
+    /// Get physical offset.
+    #[inline]
+    pub const fn offset(self) -> usize{
+        (self.virt_addr as usize) & 0xfff
+    }
+
 }
 
 /// Override 'from' trait for physical address
@@ -197,8 +240,8 @@ pub struct PTEFlags{
 
 impl PTEFlags{
     #[inline]
-    pub fn new() -> Self{
-        Self{ flags: 0}
+    pub fn new(bits: u64) -> Self{
+        Self{ flags: bits}
     }
 
     #[inline]
@@ -305,7 +348,7 @@ pub const GLOBAL: u64 =        1 << 8;
 pub const NO_EXECUTE: u64 =    1 << 63;
 
 /// 64bits page table entry.
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 #[repr(transparent)]
 pub struct PTE {
     entry: u64,
@@ -365,4 +408,23 @@ impl PTE {
         let flags: PTEFlags = PTEFlags{flags: PRESENT | WRITABLE | USER};
         Self{ entry: flags.as_u64() | paddr.phys_addr }
     }
+
+    /// Determine if the pte contains a specific flag.
+    #[inline]
+    pub fn is_contain(&self, flag: u64) -> bool{
+        return self.entry & flag != 0;
+    }
+
+    /// Determine if the page is present.
+    #[inline]
+    pub fn is_present(&self) -> bool{
+        self.is_contain(PRESENT)
+    }
+
+    /// Determine if the pte is used.
+    #[inline]
+    pub fn is_unused(&self) -> bool{
+        return self.entry & 0 == 0;
+    }
+
 }

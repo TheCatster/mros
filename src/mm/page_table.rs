@@ -6,10 +6,10 @@ use core::arch::asm;
 use core::ops::{Index, IndexMut};
 use core::slice::{from_raw_parts, from_raw_parts_mut};
 
-use super::page_table_entry::PTE;
-use super::phys_page::{phys_page_alloc, phys_page_free};
+use crate::println;
 
-use super::page_table_entry::{PhysAddr, VirtAddr};
+use super::page_table_entry::{PhysAddr, VirtAddr, PTE, PTEFlags, PRESENT, WRITABLE};
+use super::phys_page::{phys_page_alloc, phys_page_free};
 
 /// Store value to cr0.
 #[cfg(target_arch = "x86_64")]
@@ -101,18 +101,82 @@ impl PageTable{
         lcr3(self.base.to_usize() as i64);
     }
 
-    // /// Find corresponding page table entry and make it mutable.
-    // fn get_mut_pte(&mut self, vaddr: VirtAddr) -> Option<&mut PTE>{
+    /// Get next level table.
+    fn next_mut_table_as_array(&self, pte: PTE) -> &'static mut [PTE]{
+        let next_table_addr: PhysAddr = pte.phys_addr();
+        unsafe{
+            from_raw_parts_mut(next_table_addr.to_mut_ptr() as *mut PTE, NUM_PAGE_ENTRY)
+        }
+    }
 
-    // }
+    /// Create next level table.
+    fn create_next_table(&self) -> Option<PTE>{
+        let new_table = phys_page_alloc();
+        match new_table{
+            Some(next_table) => {
+                Some(PTE::new_table_entry(next_table))
+            }
+            _ => { return None; }
+        }
+    }
 
-    // /// Access corresponding page table entry read-only.
-    // fn get_pte(&self, vaddr: VirtAddr) -> Option<&mut PTE>{
+    /// Create and set up next level table. Return pte points to next table.
+    fn setup_next_table(&self, pte: &mut PTE, pte_index: usize){
+        if pte.is_unused(){
+            let result = self.create_next_table();
+            match result{
+                Some(new_pte) => {
+                    *pte = new_pte;
+                }
+                _ => {
+                    println!("[Err] Create next level page table failed.");
+                    return ;
+                }
+            }
+        } else {
+            pte.set_flags(PTEFlags::new(PRESENT | WRITABLE));
+        }
+    }
 
-    // }
+    /// Create and set up next level table. Return next level table as an array.
+    fn setup_next_table_as_array(&self, pte: &mut PTE) -> Option<&'static mut [PTE]>{
+        if pte.is_unused(){
+            let result = self.create_next_table();
+            match result{
+                Some(new_pte) => {
+                    *pte = new_pte;
+                    Some(self.next_mut_table_as_array(new_pte))
+                }
+                _ => {
+                    return None;
+                }
+            }
+        }else{
+            Some(self.next_mut_table_as_array(*pte))
+        }
+    }
 
     /// Map physical to virtual address in this page table.
-    pub fn map(&mut self, vaddr: VirtAddr, paddr: PhysAddr, flags: u64){
+    pub fn map(&mut self, vaddr: VirtAddr, paddr: PhysAddr, flags: PTEFlags){
+        let l4_table = self.to_mut_ptes();
+        let l4_index: usize = vaddr.l4_index();
+        let l4_pte: &mut PTE = &mut l4_table[l4_index];
+        self.setup_next_table(l4_pte, l4_index);
+
+        let l3_table = self.next_mut_table_as_array(*l4_pte);
+        let l3_index: usize = vaddr.l3_index();
+        let l3_pte: &mut PTE = &mut l3_table[l3_index];
+        self.setup_next_table(l3_pte, l3_index);
+
+        let l2_table = self.next_mut_table_as_array(*l3_pte);
+        let l2_index: usize = vaddr.l2_index();
+        let l2_pte: &mut PTE = &mut l2_table[l2_index];
+        self.setup_next_table(l2_pte, l2_index);
+
+        let l1_table = self.next_mut_table_as_array(*l2_pte);
+        let l1_index: usize = vaddr.l1_index();
+        // TODO: we need align down the physical address.
+        l1_table[l1_index] = PTE::new_page_entry(paddr, flags);
     }
 
     /// Unmap page.
