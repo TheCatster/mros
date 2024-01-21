@@ -1,10 +1,11 @@
 use core::slice::{from_raw_parts_mut};
 use core::arch::asm;
 
+/// GDT Selectors.
 pub const GDT_KERNEL_CODE: u64 = 0x08;
 pub const GDT_KERNEL_DATA: u64 = 0x10;
-pub const GDT_USER_DATA: u64 = 0x18;
-pub const GDT_USER_CODE: u64 = 0x20;
+pub const GDT_USER_DATA: u64   = 0x18;
+pub const GDT_USER_CODE: u64   = 0x20;
 
 /// Load global descriptor table.
 #[cfg(target_arch = "x86_64")]
@@ -78,7 +79,7 @@ impl GDTR{
 #[derive(Clone, Copy)]
 #[repr(C, packed)]
 pub struct GDT64{
-    entries: [GDE64; 4],
+    entries: [GDE64; 6],
     gdtr: GDTR,
 }
 
@@ -86,11 +87,19 @@ impl GDT64{
     /// Create a new global descriptor table.
     pub fn new() -> Self{
         Self{
-            entries: [GDE64::new(0xffff, 0, 0xa, 0x9a),
-                      GDE64::new(0xffff, 0, 0xc, 0x92),
-                      GDE64::new(0xffff, 0, 0xa, 0xfa),
-                      GDE64::new(0xffff, 0, 0xc, 0xf2)],
+            // MUST notice that the selector should be different with the init one.
+            entries: [GDE64::new(0, 0, 0, 0),
+                      GDE64::new(0xffff, 0, 0xc, 0x9a),  // KERNEL code (32-bit)
+                      GDE64::new(0xffff, 0, 0xa, 0x9a),  // KERNEL code (64-bit)
+                      GDE64::new(0xffff, 0, 0xc, 0x92),  // KERNEL data (64-bit)
+                      GDE64::new(0xffff, 0, 0xa, 0xfa),  // USER code (64-bit)
+                      GDE64::new(0xffff, 0, 0xc, 0xf2)], // USER data (64-bit)
         }
+    }
+
+    /// Get segment selector.
+    pub fn selector(index: u16) -> u16{
+        (index << 3) as u16
     }
 
     /// Enable this gdt.

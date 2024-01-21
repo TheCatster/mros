@@ -73,6 +73,8 @@ gdt:
 	.quad 0x00cf9b000000ffff	/* 0x08: KERNEL code (32-bit) */
 	.quad 0x00af9b000000ffff	/* 0x10: KERNEL code (64-bit) */
 	.quad 0x00cf93000000ffff	/* 0x18: KERNEL data (64-bit) */
+	.quad 0x00cff3000000ffff    /* 0x20: USER data (64-bit) */
+	.quad 0x00affb000000ffff    /* 0x28: USER code (64-bit) */
 gdt_end:
 
 /*
