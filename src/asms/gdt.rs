@@ -75,11 +75,14 @@ impl GDTR{
     }
 }
 
+/// Total number of global descriptor entries.
+pub const NUM_GLOBAL_DESP_ENTRIES: u32 = 6;
+
 /// Global Descriptor Table.
 #[derive(Clone, Copy)]
 #[repr(C, packed)]
 pub struct GDT64{
-    entries: [GDE64; 6],
+    entries: [GDE64; NUM_GLOBAL_DESP_ENTRIES],
     gdtr: GDTR,
 }
 
@@ -104,7 +107,7 @@ impl GDT64{
 
     /// Enable this gdt.
     pub fn enable(&mut self){
-        self.gdtr = GDTR::new(self.entries.len(), entries.to_ptr() as u64);
+        self.gdtr = GDTR::new(NUM_GLOBAL_DESP_ENTRIES, self.entries.to_ptr() as u64);
         let mut ptr: u64 = self.gdtr.to_u64();
         lgdt(ptr);
     }

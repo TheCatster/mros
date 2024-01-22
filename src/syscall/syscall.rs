@@ -4,7 +4,7 @@ use asms::msr::{rdmsr, wrmsr};
 use asms::gdt::{GDT_KERNEL_CODE, GDT_KERNEL_DATA, GDT_USER_CODE, GDT_USER_DATA};
 
 #[cfg(target_arch = "x86_64")]
-fn syscall(n: i64)->i64{
+pub extern "C" fn syscall(n: i64)->i64{
     let mut ret: u64 = 0;
     unsafe{
         asm!("syscall");
