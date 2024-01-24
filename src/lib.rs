@@ -13,7 +13,7 @@ use drivers::console::console::{MultibootInfo, fb_init};
 mod mm;
 use mm::page_table_entry::{VirtAddr, PhysAddr, PTEFlags};
 use mm::phys_page::{kernel_heap_init, phys_page_alloc, phys_page_free};
-use mm::page_table::{kernel_phys_to_virt, PageTable};
+use mm::page_table::{kernel_phys_to_virt, identical_phys_to_virt, PageTable};
 
 mod utils;
 
@@ -22,7 +22,7 @@ pub extern "C" fn kernel_start(info: *mut MultibootInfo, free_mem_base: *mut u8)
     // Setup frame buffer.
     fb_init();
 
-    println!("[+] Hello world! This is micro rust os.");
+    println!("[+] Hello world! This is micro rust os.\n");
 
     // Setup kernel heap. Enable physical page allocation.
     println!("[+] Setup kernel heap.");
@@ -31,13 +31,14 @@ pub extern "C" fn kernel_start(info: *mut MultibootInfo, free_mem_base: *mut u8)
     kernel_heap_init(&heap_base);
 
     // Test allocate physical page.
-    for i in 0..5{
+    for i in 0..4{
         let frame = phys_page_alloc();
         match frame{
             Some(phys_page) => {
                 println!("[+] Allocate frame: {:x}", phys_page.to_usize());
-                if i < 3{
+                if i < 2{
                     phys_page_free(phys_page);
+                    println!("[+] Free frame.");
                 }
             }
             _=>{
@@ -49,20 +50,26 @@ pub extern "C" fn kernel_start(info: *mut MultibootInfo, free_mem_base: *mut u8)
 
     // Enable paging.
     // Test paging. We map from 0x200000 to 0x10200000.
+    println!("\n[+] Enable paging.");
     let create_page_table = PageTable::new();
     match create_page_table{
         Some(page_table) => {
             let mut new_table = page_table;
 
-            let paddr: PhysAddr = PhysAddr::from(free_mem_base as usize + 0x10000);
-            let vaddr: VirtAddr = kernel_phys_to_virt(paddr);
+            let fb_paddr: PhysAddr = PhysAddr::from(0xb8000);
+            let fb_vaddr: VirtAddr = identical_phys_to_virt(fb_paddr);
+            new_table.map(fb_vaddr, fb_paddr, PTEFlags::new_kern_flags());
 
+            let paddr: PhysAddr = PhysAddr::from(free_mem_base as usize + 0x100000);
+            let vaddr: VirtAddr = kernel_phys_to_virt(paddr);
             new_table.map(vaddr, paddr, PTEFlags::new_kern_flags());
-            new_table.enable();
+
+            //let curr_page_table: PageTable = new_table.swap();
 
             let mapped_paddr: PhysAddr = new_table.retrieve(vaddr);
             println!{"[+] Virtual: {:x} to Physical: {:x}", vaddr.to_usize(), mapped_paddr.to_usize()};
 
+            //curr_page_table.enable();
         }
         _ => {
             println!("[Err] Failed allocate page table.");

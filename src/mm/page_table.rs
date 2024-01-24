@@ -13,33 +13,33 @@ use super::phys_page::{phys_page_alloc, PAGE_SIZE};
 
 /// Store value to cr0.
 #[cfg(target_arch = "x86_64")]
-pub fn lcr0(mut _val: i64){
+pub fn lcr0(mut _val: usize){
     unsafe{
-        asm!("movq {}, cr0", out(reg) _val);
+        asm!("mov cr0, {}", in(reg) _val);
     }
 }
 
 /// Read value from cr0.
 #[cfg(target_arch = "x86_64")]
-pub fn rcr0(_val: &mut i64){
+pub fn rcr0(mut _val: usize){
     unsafe{
-        asm!("movq cr0, {}", in(reg) _val);
+        asm!("mov {}, cr0", out(reg) _val);
     }
 }
 
 /// Store value to cr3.
 #[cfg(target_arch = "x86_64")]
-pub fn lcr3(mut _val: i64){
+pub fn lcr3(mut _val: usize){
     unsafe{
-        asm!("mov {}, cr3", out(reg) _val);
+        asm!("mov cr3, {}", in(reg) _val);
     }
 }
 
 /// Read value from cr3.
 #[cfg(target_arch = "x86_64")]
-pub fn rcr3(_val: &i64){
+pub fn rcr3(mut _val: usize){
     unsafe{
-        asm!("movq cr3, {}", in(reg) _val);
+        asm!("mov {}, cr3", out(reg) _val);
     }
 }
 
@@ -49,6 +49,12 @@ pub const KERN_MAPPING_OFFSET: usize = 0x10000000;
 #[inline]
 pub fn kernel_phys_to_virt(paddr: PhysAddr) -> VirtAddr{
     VirtAddr::from(paddr.to_usize() + KERN_MAPPING_OFFSET)
+}
+
+/// Identical mapping.
+#[inline]
+pub fn identical_phys_to_virt(paddr: PhysAddr) -> VirtAddr{
+    VirtAddr::from(paddr.to_usize())
 }
 
 /// Every page table holds 512 entries.
@@ -106,7 +112,18 @@ impl PageTable{
 
     /// Enable this page table.
     pub fn enable(&self){
-        lcr3(self.base.to_usize() as i64);
+        lcr3(self.base.to_usize());
+    }
+
+    /// Swap current page table.
+    pub fn swap(&self) -> Self{
+        let mut curr_page_table: usize = 0;
+        rcr3(curr_page_table);
+        self.enable();
+
+        Self{
+            base: PhysAddr::from(curr_page_table)
+        }
     }
 
     /// Get next level table.

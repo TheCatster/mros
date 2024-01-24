@@ -48,6 +48,12 @@ impl PhysAddr{
     pub fn to_usize(&self) -> usize{
         self.phys_addr as usize
     }
+
+    /// Conver to u64
+    #[inline]
+    pub fn to_u64(&self) -> u64{
+        self.phys_addr
+    }
 }
 
 impl VirtAddr{
