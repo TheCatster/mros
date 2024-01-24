@@ -31,7 +31,7 @@ pub fn rcr0(_val: &mut i64){
 #[cfg(target_arch = "x86_64")]
 pub fn lcr3(mut _val: i64){
     unsafe{
-        asm!("movq {}, cr3", out(reg) _val);
+        asm!("mov {}, cr3", out(reg) _val);
     }
 }
 
@@ -41,6 +41,14 @@ pub fn rcr3(_val: &i64){
     unsafe{
         asm!("movq cr3, {}", in(reg) _val);
     }
+}
+
+/// Default linearly mapping offset as 256MB.
+pub const KERN_MAPPING_OFFSET: usize = 0x10000000;
+/// Default mapping from physical to virtual address.
+#[inline]
+pub fn kernel_phys_to_virt(paddr: PhysAddr) -> VirtAddr{
+    VirtAddr::from(paddr.to_usize() + KERN_MAPPING_OFFSET)
 }
 
 /// Every page table holds 512 entries.
@@ -174,6 +182,13 @@ impl PageTable{
         let l1_index: usize = vaddr.l1_index();
 
         &mut l1_table[l1_index]
+    }
+
+    /// Get physical address.
+    pub fn retrieve(&self, vaddr: VirtAddr) -> PhysAddr{
+        let pte: &mut PTE = self.get_level1_pte(vaddr);
+        let base: PhysAddr = pte.phys_addr();
+        PhysAddr::from(base.to_usize() | vaddr.offset())
     }
 
     /// Map physical to virtual address in this page table.

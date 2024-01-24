@@ -221,3 +221,10 @@ impl IDT64{
         lidt(ptr);
     }
 }
+
+/// Interrupt Stack Frame.
+#[derive(Clone, Copy)]
+#[repr(C, packed)]
+pub struct IntrStackFrame{
+    
+}

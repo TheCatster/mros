@@ -33,19 +33,19 @@ impl PhysAddr{
 
     /// Convert to const raw pointer
     #[inline]
-    pub fn to_raw_ptr(self) -> *const u8{
+    pub fn to_raw_ptr(&self) -> *const u8{
         self.phys_addr as *const u8
     }
 
     /// Convert to mutable raw pointer
     #[inline]
-    pub fn to_mut_ptr(self) -> *mut u8{
+    pub fn to_mut_ptr(&self) -> *mut u8{
         self.phys_addr as *mut u8
     }
 
     /// Convert to usize
     #[inline]
-    pub fn to_usize(self) -> usize{
+    pub fn to_usize(&self) -> usize{
         self.phys_addr as usize
     }
 }
@@ -53,43 +53,49 @@ impl PhysAddr{
 impl VirtAddr{
     /// Convert to const raw pointer
     #[inline]
-    pub const fn to_raw_ptr(self) -> *const u8{
+    pub const fn to_raw_ptr(&self) -> *const u8{
         self.virt_addr as *const u8
     }
 
     /// Convert to mutable raw pointer
     #[inline]
-    pub const fn to_mut_ptr(self) -> *const u8{
+    pub const fn to_mut_ptr(&self) -> *const u8{
         self.virt_addr as *mut u8
+    }
+
+    /// Conver to usize.
+    #[inline]
+    pub fn to_usize(&self) -> usize{
+        self.virt_addr as usize
     }
 
     /// Get level 4 index.
     #[inline]
-    pub const fn l4_index(self) -> usize{
+    pub const fn l4_index(&self) -> usize{
         (self.virt_addr as usize) >> 39 & 0x1ff
     }
 
     /// Get level 3 index.
     #[inline]
-    pub const fn l3_index(self) -> usize{
+    pub const fn l3_index(&self) -> usize{
         (self.virt_addr as usize) >> 30 & 0x1ff
     }
 
     /// Get level 2 index.
     #[inline]
-    pub const fn l2_index(self) -> usize{
+    pub const fn l2_index(&self) -> usize{
         (self.virt_addr as usize) >> 21 & 0x1ff
     }
 
     /// Get level 1 index.
     #[inline]
-    pub const fn l1_index(self) -> usize{
+    pub const fn l1_index(&self) -> usize{
         (self.virt_addr as usize) >> 12 & 0x1ff
     }
 
     /// Given level, get index.
     #[inline]
-    pub const fn index(self, level: u32) -> usize{
+    pub const fn index(&self, level: u32) -> usize{
         match level{
             4 => {self.l4_index()}
             3 => {self.l3_index()}
@@ -101,7 +107,7 @@ impl VirtAddr{
 
     /// Get physical offset.
     #[inline]
-    pub const fn offset(self) -> usize{
+    pub const fn offset(&self) -> usize{
         (self.virt_addr as usize) & 0xfff
     }
 
@@ -258,6 +264,16 @@ impl PTEFlags{
         else{
             false
         }
+    }
+
+    #[inline]
+    pub fn new_kern_flags() -> Self{
+        Self{ flags: PRESENT | WRITABLE }
+    }
+
+    #[inline]
+    pub fn new_user_flags() -> Self{
+        Self{ flags: PRESENT | WRITABLE | USER }
     }
 }
 

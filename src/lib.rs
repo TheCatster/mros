@@ -8,11 +8,12 @@ extern crate lazy_static;
 extern crate multiboot2;
 
 mod drivers;
-use crate::drivers::console::console::{MultibootInfo, fb_init};
+use drivers::console::console::{MultibootInfo, fb_init};
 
 mod mm;
-use mm::page_table_entry::PhysAddr;
+use mm::page_table_entry::{VirtAddr, PhysAddr, PTEFlags};
 use mm::phys_page::{kernel_heap_init, phys_page_alloc, phys_page_free};
+use mm::page_table::{kernel_phys_to_virt, PageTable};
 
 mod utils;
 
@@ -47,7 +48,26 @@ pub extern "C" fn kernel_start(info: *mut MultibootInfo, free_mem_base: *mut u8)
     }
 
     // Enable paging.
-    
+    // Test paging. We map from 0x200000 to 0x10200000.
+    let create_page_table = PageTable::new();
+    match create_page_table{
+        Some(page_table) => {
+            let mut new_table = page_table;
+
+            let paddr: PhysAddr = PhysAddr::from(free_mem_base as usize + 0x10000);
+            let vaddr: VirtAddr = kernel_phys_to_virt(paddr);
+
+            new_table.map(vaddr, paddr, PTEFlags::new_kern_flags());
+            new_table.enable();
+
+            let mapped_paddr: PhysAddr = new_table.retrieve(vaddr);
+            println!{"[+] Virtual: {:x} to Physical: {:x}", vaddr.to_usize(), mapped_paddr.to_usize()};
+
+        }
+        _ => {
+            println!("[Err] Failed allocate page table.");
+        }
+    }
 
     loop{}
 }
