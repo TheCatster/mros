@@ -14,11 +14,16 @@ mod mm;
 use mm::page_table_entry::{VirtAddr, PhysAddr, PTEFlags};
 use mm::phys_page::{kernel_heap_init, phys_page_alloc, phys_page_free};
 use mm::page_table::{kernel_phys_to_virt, identical_phys_to_virt, PageTable};
+use mm::layout::{find_kernel_areas};
+
+mod asms;
+// use asms::idt::{IDT64};
+// use asms::idt::divide_by_zero_handler;
 
 mod utils;
 
 #[no_mangle]
-pub extern "C" fn kernel_start(info: *mut MultibootInfo, free_mem_base: *mut u8){
+pub extern "C" fn kernel_start(multiboot_info: usize, free_mem_base: *mut u8){
     // Setup frame buffer.
     fb_init();
 
@@ -48,8 +53,7 @@ pub extern "C" fn kernel_start(info: *mut MultibootInfo, free_mem_base: *mut u8)
         }
     }
 
-    // Enable paging.
-    // Test paging. We map from 0x200000 to 0x10200000.
+    // Test paging. We map from 0x300000 to 0x10300000.
     println!("\n[+] Enable paging.");
     let create_page_table = PageTable::new();
     match create_page_table{
@@ -67,7 +71,7 @@ pub extern "C" fn kernel_start(info: *mut MultibootInfo, free_mem_base: *mut u8)
             //let curr_page_table: PageTable = new_table.swap();
 
             let mapped_paddr: PhysAddr = new_table.retrieve(vaddr);
-            println!{"[+] Virtual: {:x} to Physical: {:x}", vaddr.to_usize(), mapped_paddr.to_usize()};
+            println!("[+] Virtual: {:x} to Physical: {:x}", vaddr.to_usize(), mapped_paddr.to_usize());
 
             //curr_page_table.enable();
         }
@@ -75,6 +79,14 @@ pub extern "C" fn kernel_start(info: *mut MultibootInfo, free_mem_base: *mut u8)
             println!("[Err] Failed allocate page table.");
         }
     }
+
+    println!("\n[+] Mapping kernel memory areas.");
+    find_kernel_areas(multiboot_info);
+
+    // Setup interrupt descriptor table.
+    // let idt: IDT64 = IDT64::new();
+    // idt.default_setup();
+    // println!("[+] Enable interruptions.");
 
     loop{}
 }

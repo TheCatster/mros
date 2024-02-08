@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use core::arch::asm;
 
 pub const MSR_EFER: u32   = 0xC0000080;
@@ -12,7 +13,7 @@ pub fn rdmsr(_reg: u32) -> u64{
     let mut high: u32;
 
     unsafe{
-        asm!("rdmsr", in(reg) low, in(reg) high, out(reg) _reg);
+        asm!("rdmsr", out("eax") low, out("edx") high, in("ecx") _reg);
     }
 
     (high as u64) << 32 | (low as u64)
@@ -25,6 +26,6 @@ pub fn wrmsr(_reg: u32, val: u64){
     let high: u32 = (val >> 32) as u32;
 
     unsafe{
-        asm!("wrmsr", out(reg) high, out(reg) low, out(reg) _reg);
+        asm!("wrmsr", in("ecx") _reg, in("eax") low, in("edx") _reg);
     }
 }

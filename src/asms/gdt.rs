@@ -33,13 +33,13 @@ impl GDE64{
     /// Create a new global descriptor entry.
     pub fn new(limit: u64, base: u64, flags: u8, privilege: u8) -> Self{
         Self{
-            limit_low: limit & 0xffff,
-            base_low: base & 0xffff,
-            base_mid: (base >> 16) & 0xffff,
+            limit_low: (limit & 0xffff) as u16,
+            base_low: (base & 0xffff) as u16,
+            base_mid: ((base >> 16) & 0xffff) as u8,
             access: privilege, 
-            flags_and_limit: ((limit >> 16) & 0xf) | flags,
-            base_high: (base >> 24) & 0xffff,
-            base_extend: (base >> 32) &ffffffff,
+            flags_and_limit: (((limit >> 16) & 0xf) | flags as u64) as u8,
+            base_high: ((base >> 24) & 0xffff) as u8,
+            base_extend: ((base >> 32) &0xffffffff) as u32,
             reserved: 0,
         }
     }
@@ -58,25 +58,20 @@ impl GDTR{
         Self{
             gdtr: [
                 num_entries,
-                gdt_base & 0xffffffff,
-                (gdt_base >> 32) & 0xffffffff,
+                (gdt_base & 0xffffffff) as u32,
+                ((gdt_base >> 32) & 0xffffffff) as u32,
             ]
         }
     }
 
-    /// Convert to pointer.
-    pub fn to_ptr(&self) -> *mut u32{
-        self.gdtr.to_ptr()
-    }
-
-    /// Conver to u64.
+    /// Conert gdtr into u64.
     pub fn to_u64(&self) -> u64{
-        self.gdtr.to_ptr() as u64
+        unsafe{self.gdtr.as_ptr() as u64}
     }
 }
 
 /// Total number of global descriptor entries.
-pub const NUM_GLOBAL_DESP_ENTRIES: u32 = 6;
+pub const NUM_GLOBAL_DESP_ENTRIES: usize = 6;
 
 /// Global Descriptor Table.
 #[derive(Clone, Copy)]
@@ -97,6 +92,7 @@ impl GDT64{
                       GDE64::new(0xffff, 0, 0xc, 0x92),  // KERNEL data (64-bit)
                       GDE64::new(0xffff, 0, 0xa, 0xfa),  // USER code (64-bit)
                       GDE64::new(0xffff, 0, 0xc, 0xf2)], // USER data (64-bit)
+            gdtr: GDTR::new(NUM_GLOBAL_DESP_ENTRIES as u32, 0),
         }
     }
 
@@ -107,7 +103,7 @@ impl GDT64{
 
     /// Enable this gdt.
     pub fn enable(&mut self){
-        self.gdtr = GDTR::new(NUM_GLOBAL_DESP_ENTRIES, self.entries.to_ptr() as u64);
+        self.gdtr = GDTR::new(NUM_GLOBAL_DESP_ENTRIES as u32, self.entries.as_ptr() as u64);
         let mut ptr: u64 = self.gdtr.to_u64();
         lgdt(ptr);
     }
