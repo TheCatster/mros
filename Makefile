@@ -1,6 +1,7 @@
 BOOT = boot.iso
 KERNEL = kernel
 RUST_KERNEL = ./target/x86_64-mros/debug/libmros.a
+ROOT_DIR := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 
 all: $(BOOT)
 
@@ -18,8 +19,8 @@ $(BOOT): $(KERNEL)
 	@rm -r ./iso_image
 
 # Compile rust kernel
-$(RUST_KERNEL): 
-	RUST_TARGET_PATH=/home/arjenk/Documents/workspace/mros xargo build --target x86_64-mros
+$(RUST_KERNEL):
+	RUST_TARGET_PATH="$(ROOT_DIR)" xargo build --target x86_64-mros
 
 # Kernel and user program compilation
 CC = gcc
@@ -29,7 +30,7 @@ CFLAGS += -mcmodel=small -Wall -Wno-builtin-declaration-mismatch -O2 -fno-pie -m
 LDFLAGS = --gc-sections -n
 
 KERNEL_OBJS = kernel_entry.o
-KERNEL_OBJS += $(RUST_KERNEL) kernel_asm.o 
+KERNEL_OBJS += $(RUST_KERNEL) kernel_asm.o
 
 $(KERNEL): $(KERNEL_OBJS)
 	$(LD) $(LDFLAGS) -T ./kernel.lds $^ -o $@
