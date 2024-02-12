@@ -20,7 +20,7 @@ $(BOOT): $(KERNEL)
 
 # Compile rust kernel
 $(RUST_KERNEL):
-	RUST_TARGET_PATH="$(ROOT_DIR)" xargo build --target x86_64-mros
+	RUST_TARGET_PATH="$(ROOT_DIR)" cargo build
 
 # Kernel and user program compilation
 CC = gcc
