@@ -47,7 +47,7 @@ $(KERNEL): $(KERNEL_OBJS)
 # Compile rust kernel
 $(RUST_KERNEL):
 	@mkdir -p build/$(ARCH)
-	RUST_TARGET_PATH="$(ROOT_DIR)targets" cargo build --target $(ARCH)-unknown-mros
+	RUST_TARGET_PATH="$(ROOT_DIR)" cargo build --target "targets/$(ARCH)-unknown-mros.json"
 
 build/%.o: %.c
 	@mkdir -p build
