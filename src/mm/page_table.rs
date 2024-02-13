@@ -8,38 +8,88 @@ use core::slice::{from_raw_parts, from_raw_parts_mut};
 
 use crate::println;
 
-use super::page_table_entry::{PhysAddr, VirtAddr, PTE, PTEFlags, PRESENT, WRITABLE};
+use super::page_table_entry::{PTEFlags, PhysAddr, VirtAddr, PRESENT, PTE, WRITABLE};
 use super::phys_page::{phys_page_alloc, PAGE_SIZE};
 
 /// Store value to cr0.
 #[cfg(target_arch = "x86_64")]
-pub fn lcr0(mut _val: usize){
-    unsafe{
+pub fn lcr0(mut _val: usize) {
+    unsafe {
         asm!("mov cr0, {}", in(reg) _val);
     }
 }
 
 /// Read value from cr0.
 #[cfg(target_arch = "x86_64")]
-pub fn rcr0(mut _val: usize){
-    unsafe{
+pub fn rcr0(mut _val: usize) {
+    unsafe {
         asm!("mov {}, cr0", out(reg) _val);
     }
 }
 
 /// Store value to cr3.
 #[cfg(target_arch = "x86_64")]
-pub fn lcr3(mut _val: usize){
-    unsafe{
+pub fn lcr3(mut _val: usize) {
+    unsafe {
         asm!("mov cr3, {}", in(reg) _val);
     }
 }
 
 /// Read value from cr3.
 #[cfg(target_arch = "x86_64")]
-pub fn rcr3(mut _val: usize){
-    unsafe{
+pub fn rcr3(mut _val: usize) {
+    unsafe {
         asm!("mov {}, cr3", out(reg) _val);
+    }
+}
+
+/// Enable or disable MMU (cr0 in x86_64).
+#[cfg(target_arch = "aarch64")]
+pub fn set_sctlr(value: usize) {
+    unsafe {
+        asm!(
+            "msr sctlr_el1, {}",
+            in(reg) value,
+            options(nostack)
+        );
+    }
+}
+
+/// Read value from SCTLR.
+#[cfg(target_arch = "aarch64")]
+pub fn get_sctlr() -> usize {
+    let mut value: usize;
+    unsafe {
+        asm!(
+            "mrs {}, sctlr_el1",
+            out(reg) value,
+            options(nostack)
+        );
+    }
+    value
+}
+
+/// Store value to TTBR0_EL1 (lcr3 in x86_64).
+#[cfg(target_arch = "aarch64")]
+pub fn set_ttbr0_el1(_val: usize) {
+    unsafe {
+        asm!(
+            "msr ttbr0_el1, {}",
+            in(reg) _val,
+            options(nostack)
+        );
+    }
+}
+
+/// Read value from TTBR0_EL1 (rcr3 in x86_64).
+#[cfg(target_arch = "aarch64")]
+pub fn get_ttbr0_el1(mut _val: usize) {
+    unsafe {
+        asm!(
+            "mrs {}, ttbr0_el1",
+            out(reg) _val,
+            options(nostack)
+        );
     }
 }
 
@@ -47,115 +97,125 @@ pub fn rcr3(mut _val: usize){
 pub const KERN_MAPPING_OFFSET: usize = 0x10000000;
 /// Default mapping from physical to virtual address.
 #[inline]
-pub fn kernel_phys_to_virt(paddr: PhysAddr) -> VirtAddr{
+pub fn kernel_phys_to_virt(paddr: PhysAddr) -> VirtAddr {
     VirtAddr::from(paddr.to_usize() + KERN_MAPPING_OFFSET)
 }
 
 /// Identical mapping.
 #[inline]
-pub fn identical_phys_to_virt(paddr: PhysAddr) -> VirtAddr{
+pub fn identical_phys_to_virt(paddr: PhysAddr) -> VirtAddr {
     VirtAddr::from(paddr.to_usize())
 }
 
 /// Every page table holds 512 entries.
 pub const NUM_PAGE_ENTRY: usize = 512;
 
-pub struct PageTable{
+pub struct PageTable {
     base: PhysAddr,
 }
 
 /// Provide index trait for page table.
-impl Index<usize> for PageTable{
+impl Index<usize> for PageTable {
     type Output = PTE;
 
-    fn index(&self, index: usize) -> &PTE{
+    fn index(&self, index: usize) -> &PTE {
         let ptes: &'static [PTE] = self.to_ptes();
         &ptes[index]
     }
 }
 
 /// Provide mutable index trait for page table.
-impl IndexMut<usize> for PageTable{
-    fn index_mut(&mut self, index: usize) -> &mut PTE{
+impl IndexMut<usize> for PageTable {
+    fn index_mut(&mut self, index: usize) -> &mut PTE {
         let mut ptes: &mut [PTE] = self.to_mut_ptes();
         &mut ptes[index]
     }
 }
 
-impl PageTable{
+impl PageTable {
     /// Create a new page table.
-    pub fn new() -> Option<Self>{
+    pub fn new() -> Option<Self> {
         let result = phys_page_alloc();
-        match result{
-            Some(phys_page)=>{
-                Some(Self{base: phys_page})
-            }
-            _ => {
-                None
-            }
+        match result {
+            Some(phys_page) => Some(Self { base: phys_page }),
+            _ => None,
         }
     }
 
     /// Convert page table to a pte array.
-    pub fn to_ptes(&self) -> &'static [PTE]{
-        unsafe{
-            from_raw_parts(self.base.to_raw_ptr() as *mut PTE, NUM_PAGE_ENTRY)
-        }
+    pub fn to_ptes(&self) -> &'static [PTE] {
+        unsafe { from_raw_parts(self.base.to_raw_ptr() as *mut PTE, NUM_PAGE_ENTRY) }
     }
 
     /// Convert page table to a mutable pte array.
-    pub fn to_mut_ptes(&self) -> &'static mut [PTE]{
-        unsafe{
-            from_raw_parts_mut(self.base.to_mut_ptr() as *mut PTE, NUM_PAGE_ENTRY)
-        }
+    pub fn to_mut_ptes(&self) -> &'static mut [PTE] {
+        unsafe { from_raw_parts_mut(self.base.to_mut_ptr() as *mut PTE, NUM_PAGE_ENTRY) }
     }
 
-    /// Enable this page table.
-    pub fn enable(&self){
+    /// Enable this page table on x86_64.
+    #[cfg(target_arch = "x86_64")]
+    pub fn enable(&self) {
         lcr3(self.base.to_usize());
     }
 
-    /// Swap current page table.
-    pub fn swap(&self) -> Self{
+    /// Enable this page table on aarch64.
+    #[cfg(target_arch = "aarch64")]
+    pub fn enable(&self) {
+        set_ttbr0_el1(self.base.to_usize());
+    }
+
+    /// Swap current page table on x86_64.
+    #[cfg(target_arch = "x86_64")]
+    pub fn swap(&self) -> Self {
         let mut curr_page_table: usize = 0;
         rcr3(curr_page_table);
         self.enable();
 
-        Self{
-            base: PhysAddr::from(curr_page_table)
+        Self {
+            base: PhysAddr::from(curr_page_table),
+        }
+    }
+
+    /// Swap current page table on aarch64.
+    #[cfg(target_arch = "aarch64")]
+    pub fn swap(&self) -> Self {
+        let mut curr_page_table: usize = 0;
+        get_ttbr0_el1(curr_page_table);
+        self.enable();
+
+        Self {
+            base: PhysAddr::from(curr_page_table),
         }
     }
 
     /// Get next level table.
-    fn next_mut_table_as_array(&self, pte: PTE) -> &'static mut [PTE]{
+    fn next_mut_table_as_array(&self, pte: PTE) -> &'static mut [PTE] {
         let next_table_addr: PhysAddr = pte.phys_addr();
-        unsafe{
-            from_raw_parts_mut(next_table_addr.to_mut_ptr() as *mut PTE, NUM_PAGE_ENTRY)
-        }
+        unsafe { from_raw_parts_mut(next_table_addr.to_mut_ptr() as *mut PTE, NUM_PAGE_ENTRY) }
     }
 
     /// Create next level table.
-    fn create_next_table(&self) -> Option<PTE>{
+    fn create_next_table(&self) -> Option<PTE> {
         let new_table = phys_page_alloc();
-        match new_table{
-            Some(next_table) => {
-                Some(PTE::new_table_entry(next_table))
+        match new_table {
+            Some(next_table) => Some(PTE::new_table_entry(next_table)),
+            _ => {
+                return None;
             }
-            _ => { return None; }
         }
     }
 
     /// Create and set up next level table. Return pte points to next table.
-    fn setup_next_table(&self, pte: &mut PTE, pte_index: usize){
-        if pte.is_unused(){
+    fn setup_next_table(&self, pte: &mut PTE, pte_index: usize) {
+        if pte.is_unused() {
             let result = self.create_next_table();
-            match result{
+            match result {
                 Some(new_pte) => {
                     *pte = new_pte;
                 }
                 _ => {
                     println!("[Err] Create next level page table failed.");
-                    return ;
+                    return;
                 }
             }
         } else {
@@ -164,10 +224,10 @@ impl PageTable{
     }
 
     /// Create and set up next level table. Return next level table as an array.
-    fn setup_next_table_as_array(&self, pte: &mut PTE) -> Option<&'static mut [PTE]>{
-        if pte.is_unused(){
+    fn setup_next_table_as_array(&self, pte: &mut PTE) -> Option<&'static mut [PTE]> {
+        if pte.is_unused() {
             let result = self.create_next_table();
-            match result{
+            match result {
                 Some(new_pte) => {
                     *pte = new_pte;
                     Some(self.next_mut_table_as_array(new_pte))
@@ -176,14 +236,14 @@ impl PageTable{
                     return None;
                 }
             }
-        }else{
+        } else {
             Some(self.next_mut_table_as_array(*pte))
         }
     }
 
     /// Get level 1 page table entry.
-    pub fn get_level1_pte(&self, vaddr: VirtAddr) -> &mut PTE{
-        let l4_table: & [PTE] = self.to_ptes();
+    pub fn get_level1_pte(&self, vaddr: VirtAddr) -> &mut PTE {
+        let l4_table: &[PTE] = self.to_ptes();
         let l4_index: usize = vaddr.l4_index();
         let l4_pte = l4_table[l4_index];
 
@@ -202,7 +262,7 @@ impl PageTable{
     }
 
     /// Get physical address.
-    pub fn retrieve(&self, vaddr: VirtAddr) -> PhysAddr{
+    pub fn retrieve(&self, vaddr: VirtAddr) -> PhysAddr {
         let pte: &mut PTE = self.get_level1_pte(vaddr);
         let base: PhysAddr = pte.phys_addr();
         PhysAddr::from(base.to_usize() | vaddr.offset())
@@ -210,8 +270,7 @@ impl PageTable{
 
     /// Map physical to virtual address in this page table.
     /// TODO: WE MUST ALIGN ADDRESSES!
-    pub fn map(&mut self, vaddr: VirtAddr, paddr: PhysAddr, flags: PTEFlags){
-
+    pub fn map(&mut self, vaddr: VirtAddr, paddr: PhysAddr, flags: PTEFlags) {
         let l4_table = self.to_mut_ptes();
         let l4_index: usize = vaddr.l4_index();
         let l4_pte: &mut PTE = &mut l4_table[l4_index];
@@ -233,17 +292,22 @@ impl PageTable{
     }
 
     /// Unmap page.
-    pub fn unmap(&mut self, vaddr: VirtAddr){
+    pub fn unmap(&mut self, vaddr: VirtAddr) {
         let l1_pte = self.get_level1_pte(vaddr);
         l1_pte.set_unused();
     }
 
     /// Map a physical region [phys_start, phys_start + size) to [virt_start, virt_start + size).
     /// TODO: align addresses.
-    pub fn map_region(&mut self, virt_start: VirtAddr, phys_start: PhysAddr, 
-                      size: usize, flags: PTEFlags){
+    pub fn map_region(
+        &mut self,
+        virt_start: VirtAddr,
+        phys_start: PhysAddr,
+        size: usize,
+        flags: PTEFlags,
+    ) {
         let mut step: usize = 0;
-        while step < size{
+        while step < size {
             let virt_step: VirtAddr = virt_start + step;
             let phys_step: PhysAddr = phys_start + step;
             self.map(virt_step, phys_step, flags);
@@ -252,13 +316,12 @@ impl PageTable{
     }
 
     /// Unmap a virtual region [virt_start, virt_start + size).
-    pub fn unmap_region(&mut self, virt_start: VirtAddr, size: usize){
+    pub fn unmap_region(&mut self, virt_start: VirtAddr, size: usize) {
         let mut step: usize = 0;
-        while step < size{
+        while step < size {
             let virt_step: VirtAddr = virt_start + step;
             self.unmap(virt_step);
             step += PAGE_SIZE;
         }
     }
-
 }
