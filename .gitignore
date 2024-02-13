@@ -1,6 +1,6 @@
 # Ignore output results
 kernel
-boot.iso
+*.iso
 
 ########
 # Rust #
