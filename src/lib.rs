@@ -1,27 +1,37 @@
+// Remove standard library, since we are writing our own OS.
 #![feature(lang_items)]
 #![no_std]
-
-use core::panic::PanicInfo;
 
 #[macro_use]
 extern crate lazy_static;
 extern crate multiboot2;
 
+/// Drivers
 mod drivers;
+
+/// Memory management
+mod mm;
+
+// Assembler code
+mod asms;
+
+/// Utilities
+mod utils;
+
+
 use drivers::console::console::{MultibootInfo, fb_init};
 
-mod mm;
 use mm::page_table_entry::{VirtAddr, PhysAddr, PTEFlags};
 use mm::phys_page::{kernel_heap_init, phys_page_alloc, phys_page_free};
 use mm::page_table::{kernel_phys_to_virt, identical_phys_to_virt, PageTable};
 use mm::layout::{find_kernel_areas};
 
-mod asms;
+use core::panic::PanicInfo;
+
 // use asms::idt::{IDT64};
 // use asms::idt::divide_by_zero_handler;
 
-mod utils;
-
+/// This is the main entry point of the kernel.
 #[no_mangle]
 pub extern "C" fn kernel_start(multiboot_info: usize, free_mem_base: *mut u8){
     // Setup frame buffer.
@@ -91,10 +101,12 @@ pub extern "C" fn kernel_start(multiboot_info: usize, free_mem_base: *mut u8){
     loop{}
 }
 
+/// Stack unwinding.
 #[lang = "eh_personality"] 
 #[no_mangle] 
 pub extern fn eh_personality() {}
 
+/// This function is called on panic. It will never return.
 #[panic_handler]
 #[no_mangle]
 fn panic(_info: &PanicInfo) -> ! {
