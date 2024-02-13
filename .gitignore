@@ -1,6 +1,5 @@
 # Ignore output results
-kernel
-*.iso
+build/
 
 ########
 # Rust #

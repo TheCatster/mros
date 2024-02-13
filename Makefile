@@ -6,8 +6,8 @@ CFLAGS += -mcmodel=small -Wall -Wno-builtin-declaration-mismatch -O2 -fno-pie -m
 LDFLAGS = --gc-sections -n
 
 ARCH ?= x86_64
-KERNEL := build/$(ARCH)-kernel.bin
-RUST_KERNEL = build/$(ARCH)/libmros.a
+KERNEL := build/$(ARCH)-kernel
+RUST_KERNEL = target/$(ARCH)-unknown-mros/debug/libmros.a
 ISO := build/$(ARCH)-mros.iso
 ROOT_DIR := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 
@@ -17,9 +17,9 @@ assembly_source_files := $(wildcard asm/$(ARCH)/*.S)
 assembly_object_files := $(patsubst asm/$(ARCH)/%.S, \
     build/%.o, $(assembly_source_files))
 
-.PHONY: all clean run iso
+.PHONY: all clean run xen qemu
 
-all: iso
+all: $(ISO)
 
 clean:
 	cargo clean
@@ -31,17 +31,18 @@ qemu: $(ISO)
 xen: $(BOOT)
 	sudo xl create ./kernel.cfg
 
-iso: $(ISO)
-
 $(ISO): $(KERNEL) $(grub_cfg)
 	@mkdir -p build/isofiles/boot/grub
-	@cp $(KERNEL) build/isofiles/boot/kernel.bin
+	@cp $(KERNEL) build/isofiles/boot/kernel
 	@cp $(grub_cfg) build/isofiles/boot/grub
-	@grub-mkrescue -o $(ISO) build/isofiles 2> /dev/null
+	@grub-mkrescue -o $(ISO) build/isofiles
 
-$(KERNEL): $(assembly_object_files) $(linker_script) $(RUST_KERNEL)
+KERNEL_OBJS = build/kernel_entry.o
+KERNEL_OBJS += $(RUST_KERNEL) build/kernel_asm.o
+
+$(KERNEL): $(KERNEL_OBJS)
 	@mkdir -p build
-	$(LD) $(LDFLAGS) -T $(linker_script) -o $(KERNEL) $(assembly_object_files)
+	$(LD) $(LDFLAGS) -T $(linker_script) $^ -o $@
 
 # Compile rust kernel
 $(RUST_KERNEL):
@@ -49,7 +50,9 @@ $(RUST_KERNEL):
 	RUST_TARGET_PATH="$(ROOT_DIR)targets" cargo build --target $(ARCH)-unknown-mros
 
 build/%.o: %.c
+	@mkdir -p build
 	$(CC) $(CFLAGS) -I ./include -c -o $@ $<
 
 build/%.o: asm/$(ARCH)/%.S
+	@mkdir -p build
 	$(CC) $(CFLAGS) -I ./include -c -o $@ $<
